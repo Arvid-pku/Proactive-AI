@@ -142,7 +142,7 @@ async function onActionClick(e: Event) {
           type: "OPEN_SIDE_PANEL",
           payload: { text: selText, actionId }
         });
-        toast("Opening side panel...");
+        toast("Opening panel in new tab...");
       } else {
         toast("Extension API not available");
       }
