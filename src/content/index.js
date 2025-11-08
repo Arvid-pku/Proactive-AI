@@ -30,6 +30,22 @@ let lastSuggestionTimestamp = 0;
 const TRIGGER_SIZE = 20;
 const TRIGGER_OFFSET = 12;
 
+function computeUpperRightPosition(rect) {
+  const centerX = Math.min(
+    rect.right + TRIGGER_OFFSET,
+    window.innerWidth - TRIGGER_SIZE / 2 - 4
+  );
+  const centerY = Math.max(rect.top - TRIGGER_OFFSET, TRIGGER_OFFSET);
+  const clampedY = Math.min(
+    centerY,
+    window.innerHeight - TRIGGER_SIZE / 2 - 4
+  );
+  return {
+    x: centerX,
+    y: clampedY
+  };
+}
+
 // Track mouse position
 document.addEventListener('mousemove', (e) => {
   mousePosition = { x: e.clientX, y: e.clientY };
@@ -79,18 +95,22 @@ function handleSelection() {
     
     selectedElement = element;
     
-    const triggerPosition = {
-      x: Math.min(rect.right + TRIGGER_OFFSET, window.innerWidth - TRIGGER_OFFSET),
-      y: Math.min(Math.max(rect.top + rect.height / 2, TRIGGER_OFFSET), window.innerHeight - TRIGGER_OFFSET)
-    };
+    const triggerPosition = computeUpperRightPosition(rect);
     
     pendingAnalysis = {
       type: 'text',
       text,
       element,
       position: triggerPosition,
-      trigger: 'selection'
+      trigger: 'selection',
+      isOCR: false,
+      ocrConfidence: null,
+      showRequested: false,
+      loading: false,
+      tools: null
     };
+    
+    preparePendingAnalysis(pendingAnalysis);
     
     showAnalysisTrigger(triggerPosition, {
       label: '',
@@ -113,7 +133,6 @@ async function runImageOCR(element, triggerPosition = null) {
     console.log('Starting OCR for image after user confirmation...');
     
     selectedElement = element;
-    pendingAnalysis = null;
     removeAnalysisTrigger();
     
     // Update badge to processing state
@@ -132,13 +151,13 @@ async function runImageOCR(element, triggerPosition = null) {
       isOCR: true
     };
     
+    const rect = element.getBoundingClientRect();
+    const anchorPosition = computeUpperRightPosition(rect);
+    
     showUI({
       tools: ['ocr_image'],
       content: 'Analyzing image...',
-      position: {
-        x: triggerPosition?.x ?? mousePosition.x,
-        y: triggerPosition?.y ?? mousePosition.y + 20
-      },
+      position: anchorPosition,
       contentTypes: ['image'],
       trigger: 'image-ocr',
       loading: true,
@@ -154,18 +173,21 @@ async function runImageOCR(element, triggerPosition = null) {
       // Update badge to success state
       updateImageBadgeState(element, 'success');
       
-      // Analyze the extracted text
-      analyzeAndShowTools({
+      const analysisPosition = anchorPosition;
+      pendingAnalysis = {
+        type: 'text',
         text: ocrResult.text,
         element,
-        position: {
-          x: triggerPosition?.x ?? mousePosition.x,
-          y: triggerPosition?.y ?? mousePosition.y + 20
-        },
+        position: analysisPosition,
         trigger: 'image-ocr',
         isOCR: true,
-        ocrConfidence: ocrResult.confidence
-      });
+        ocrConfidence: ocrResult.confidence,
+        showRequested: true,
+        loading: true,
+        tools: null
+      };
+      
+      preparePendingAnalysis(pendingAnalysis);
     } else {
       console.warn('No text found in image');
       removeImageBadge();
@@ -203,14 +225,21 @@ function showImageBadge(element, clickPosition = null) {
   badge.setAttribute('aria-label', 'Extract text with AI');
   
   const rect = element.getBoundingClientRect();
-  const baseLeft = rect.left;
-  const baseTop = rect.top;
-  const pointerLeft = clickPosition ? clickPosition.x - TRIGGER_SIZE / 2 : baseLeft;
-  const pointerTop = clickPosition ? clickPosition.y - TRIGGER_SIZE / 2 : baseTop;
+  const anchor = computeUpperRightPosition(rect);
+  const centerX = clickPosition?.x ?? anchor.x;
+  const centerY = clickPosition?.y ?? anchor.y;
+  const left = Math.min(
+    Math.max(centerX - TRIGGER_SIZE / 2, 4),
+    window.innerWidth - TRIGGER_SIZE - 4
+  );
+  const top = Math.min(
+    Math.max(centerY - TRIGGER_SIZE / 2, 4),
+    window.innerHeight - TRIGGER_SIZE - 4
+  );
   
   badge.style.position = 'fixed';
-  badge.style.top = `${Math.min(Math.max(pointerTop, 4), window.innerHeight - TRIGGER_SIZE - 4)}px`;
-  badge.style.left = `${Math.min(Math.max(pointerLeft, 4), window.innerWidth - TRIGGER_SIZE - 4)}px`;
+  badge.style.top = `${top}px`;
+  badge.style.left = `${left}px`;
   badge.style.pointerEvents = 'auto';
   badge.style.cursor = 'pointer';
   
@@ -343,24 +372,28 @@ function removeAnalysisTrigger() {
   }
 }
 
-async function runPendingAnalysis() {
+function runPendingAnalysis() {
   if (!pendingAnalysis) return;
   
-  const data = pendingAnalysis;
-  pendingAnalysis = null;
+  const target = pendingAnalysis;
   removeAnalysisTrigger();
   
-  if (data.type === 'image') {
-    await runImageOCR(data.element, data.position);
+  if (target.type === 'image') {
+    runImageOCR(target.element, target.position);
     return;
   }
   
-  analyzeAndShowTools({
-    text: data.text,
-    element: data.element,
-    position: data.position,
-    trigger: data.trigger
-  });
+  target.showRequested = true;
+  
+  if (!target.metadata) {
+    preparePendingAnalysis(target);
+  }
+  
+  if (target.loading) {
+    showLoadingState(target);
+  } else {
+    showPreparedAnalysis(target);
+  }
 }
 
 function handleDocumentClick(event) {
@@ -384,16 +417,15 @@ function handleDocumentClick(event) {
     event.stopPropagation();
     selectedText = '';
     selectedElement = event.target;
+    const rect = event.target.getBoundingClientRect();
+    const triggerPosition = computeUpperRightPosition(rect);
     pendingAnalysis = {
       type: 'image',
       element: event.target,
-      position: {
-        x: event.clientX,
-        y: event.clientY
-      },
+      position: triggerPosition,
       trigger: 'image-click'
     };
-    showImageBadge(event.target, { x: event.clientX, y: event.clientY });
+    showImageBadge(event.target);
     removeAnalysisTrigger();
     hideUI();
     return;
@@ -405,76 +437,144 @@ function handleDocumentClick(event) {
   }
 }
 
-/**
- * Analyze content and show appropriate tools
- */
-async function analyzeAndShowTools({ text, element, position, trigger, isOCR = false, ocrConfidence = null }) {
-  try {
-    pendingAnalysis = null;
-    const analysis = analyzeContent(text, element);
-    const contentTypes = analysis.types;
-    const context = getContext(element);
-    const metadata = buildSelectionMetadata({
-      text,
-      element,
-      analysis,
-      trigger,
-      context,
-      isOCR,
-      ocrConfidence
-    });
-    
-    const requestPayload = {
-      content: text.slice(0, 500),
-      context: context.slice(-1000),
-      contentTypes,
-      metadata
+const FALLBACK_TOOLS = {
+  math: ['graph_equation', 'explain_math'],
+  code: ['explain_code', 'debug_code'],
+  text: ['summarize', 'explain_text'],
+  foreign: ['translate', 'pronounce'],
+  chemical: ['visualize_chemical'],
+  table: ['export_table', 'visualize_data']
+};
+
+function computeFallbackTools(contentTypes = []) {
+  const tools = contentTypes
+    .flatMap(type => FALLBACK_TOOLS[type] || [])
+    .slice(0, 4);
+  return tools.length ? tools : ['save_note', 'summarize'];
+}
+
+function showLoadingState(target) {
+  showUI({
+    tools: target.tools || [],
+    content: target.text,
+    position: target.position,
+    contentTypes: target.contentTypes || [],
+    trigger: target.trigger,
+    loading: true,
+    metadata: target.metadata,
+    isOCR: target.isOCR,
+    ocrConfidence: target.ocrConfidence
+  });
+}
+
+function showPreparedAnalysis(target) {
+  showUI({
+    tools: target.tools || [],
+    content: target.text,
+    position: target.position,
+    contentTypes: target.contentTypes || [],
+    trigger: target.trigger,
+    metadata: target.metadata,
+    isOCR: target.isOCR,
+    ocrConfidence: target.ocrConfidence
+  });
+}
+
+async function preparePendingAnalysis(target) {
+  if (!target || !target.element) return;
+  
+  const analysis = analyzeContent(target.text, target.element);
+  const contentTypes = analysis.types;
+  const context = getContext(target.element);
+  const metadata = buildSelectionMetadata({
+    text: target.text,
+    element: target.element,
+    analysis,
+    trigger: target.trigger,
+    context,
+    isOCR: target.isOCR,
+    ocrConfidence: target.ocrConfidence
+  });
+  
+  target.analysis = analysis;
+  target.contentTypes = contentTypes;
+  target.context = context;
+  target.metadata = metadata;
+  target.loading = true;
+  const requestId = Date.now();
+  target.requestId = requestId;
+  
+  if (target.showRequested) {
+    showLoadingState(target);
+  }
+  
+  const requestPayload = {
+    content: target.text.slice(0, 500),
+    context: context.slice(-1000),
+    contentTypes,
+    metadata
+  };
+  
+  const cacheKey = JSON.stringify({
+    content: requestPayload.content,
+    context: requestPayload.context,
+    types: contentTypes
+  });
+  
+  const now = Date.now();
+  let response = null;
+  
+  if (cacheKey === lastSuggestionKey && now - lastSuggestionTimestamp < SUGGESTION_CACHE_TTL && lastSuggestionResult) {
+    response = {
+      ...lastSuggestionResult,
+      tools: Array.isArray(lastSuggestionResult.tools) ? [...lastSuggestionResult.tools] : [],
+      cached: true
     };
-    
-    const cacheKey = JSON.stringify({
-      content: requestPayload.content,
-      context: requestPayload.context,
-      types: contentTypes
-    });
-    
-    let response = null;
-    const now = Date.now();
-    if (cacheKey === lastSuggestionKey && now - lastSuggestionTimestamp < SUGGESTION_CACHE_TTL && lastSuggestionResult) {
-      response = { ...lastSuggestionResult, cached: true };
-    } else {
+  } else {
+    try {
       response = await chrome.runtime.sendMessage({
         action: 'GET_TOOL_SUGGESTIONS',
         data: requestPayload
       });
-      
       if (response && response.success) {
         lastSuggestionKey = cacheKey;
         lastSuggestionResult = response;
         lastSuggestionTimestamp = now;
       }
+    } catch (error) {
+      if (error?.message?.includes('Extension context invalidated')) {
+        console.warn('Extension was reloaded. Request aborted.');
+        alert('Proactive AI Assistant was updated. Please refresh this page (F5) to continue using it.');
+      } else {
+        console.error('Error requesting tool suggestions:', error);
+      }
+      response = null;
     }
-    
-    if (response && response.success) {
-      showUI({
-        tools: response.tools,
-        content: text,
-        position,
-        contentTypes,
-        trigger,
-        metadata,
-        isOCR,
-        ocrConfidence
-      });
-    }
-    
-  } catch (error) {
-    if (error.message && error.message.includes('Extension context invalidated')) {
-      console.warn('Extension was reloaded. Please refresh this page to use the assistant.');
-      // Show a user-friendly message
-      alert('Proactive AI Assistant was updated. Please refresh this page (F5) to continue using it.');
-    } else {
-      console.error('Error analyzing content:', error);
-    }
+  }
+  
+  if (pendingAnalysis !== target || target.requestId !== requestId) {
+    return;
+  }
+  
+  target.loading = false;
+  
+  if (response && response.success && Array.isArray(response.tools)) {
+    target.tools = response.tools.slice(0, 4);
+    target.response = response;
+  } else if (response && Array.isArray(response.tools)) {
+    target.tools = response.tools.slice(0, 4);
+    target.response = response;
+  } else {
+    target.tools = computeFallbackTools(contentTypes);
+    target.response = { success: false, fallback: true, tools: target.tools };
+  }
+  
+  if (!target.tools || target.tools.length === 0) {
+    target.tools = computeFallbackTools(contentTypes);
+  }
+  
+  if (target.showRequested) {
+    showPreparedAnalysis(target);
   }
 }
 
