@@ -41,7 +41,18 @@ module.exports = {
       patterns: [
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'src/icons', to: 'icons' },
-        { from: 'src/content/content.css', to: 'content.css' }
+        { from: 'src/content/content.css', to: 'content.css' },
+        // Copy Tesseract.js worker files
+        { 
+          from: 'node_modules/tesseract.js/dist/worker.min.js', 
+          to: 'tesseract-worker.min.js',
+          noErrorOnMissing: true
+        },
+        { 
+          from: 'node_modules/tesseract.js-core/tesseract-core.wasm.js', 
+          to: 'tesseract-core.wasm.js',
+          noErrorOnMissing: true
+        }
       ]
     }),
     new HtmlWebpackPlugin({

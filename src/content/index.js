@@ -3,7 +3,8 @@
  * Monitors DOM, tracks mouse position, and manages UI injection
  */
 
-import { analyzeContent, getContext, extractText } from '../utils/contentDetectors.js';
+import { analyzeContent, getContext, extractText, detectImage } from '../utils/contentDetectors.js';
+import { extractTextFromImage, isImage } from '../utils/ocrHelper.js';
 
 // State
 let mousePosition = { x: 0, y: 0 };
@@ -11,6 +12,8 @@ let selectedElement = null;
 let selectedText = '';
 let debounceTimer = null;
 let uiInjected = false;
+let currentOCRBadge = null;
+let hoveredImageElement = null;
 
 // Configuration
 const DEBOUNCE_DELAY = 800; // ms to wait before showing UI
@@ -29,13 +32,25 @@ document.addEventListener('keyup', handleSelection);
 document.addEventListener('mouseover', (e) => {
   clearTimeout(debounceTimer);
   
+  // Check if hovering over an image
+  if (isImage(e.target)) {
+    showImageBadge(e.target);
+    hoveredImageElement = e.target;
+  }
+  
   debounceTimer = setTimeout(() => {
     handleHover(e.target);
   }, DEBOUNCE_DELAY);
 });
 
-document.addEventListener('mouseout', () => {
+document.addEventListener('mouseout', (e) => {
   clearTimeout(debounceTimer);
+  
+  // Remove badge when leaving image
+  if (hoveredImageElement && (e.target === hoveredImageElement || hoveredImageElement.contains(e.target))) {
+    removeImageBadge();
+    hoveredImageElement = null;
+  }
 });
 
 /**
@@ -87,12 +102,18 @@ function handleSelection() {
 /**
  * Handle hover over element
  */
-function handleHover(element) {
+async function handleHover(element) {
   // Skip if text is selected
   if (selectedText) return;
   
   // Skip UI elements, buttons, etc.
   if (shouldSkipElement(element)) return;
+  
+  // Check if element is an image
+  if (isImage(element)) {
+    await handleImageHover(element);
+    return;
+  }
   
   const text = extractText(element);
   
@@ -109,6 +130,138 @@ function handleHover(element) {
       trigger: 'hover'
     });
   }
+}
+
+/**
+ * Handle hover over image element - perform OCR
+ */
+async function handleImageHover(element) {
+  try {
+    console.log('🖼️ Image detected, performing OCR...');
+    
+    selectedElement = element;
+    
+    // Update badge to processing state
+    updateImageBadgeState(element, 'processing');
+    
+    // Show loading indicator
+    showUI({
+      tools: ['ocr_image'],
+      content: 'Analyzing image...',
+      position: {
+        x: mousePosition.x,
+        y: mousePosition.y + 20
+      },
+      contentTypes: ['image'],
+      trigger: 'hover',
+      loading: true
+    });
+    
+    // Perform OCR
+    const ocrResult = await extractTextFromImage(element);
+    
+    if (ocrResult && ocrResult.text) {
+      console.log(`✅ OCR found ${ocrResult.words} words (confidence: ${ocrResult.confidence.toFixed(1)}%)`);
+      
+      // Update badge to success state
+      updateImageBadgeState(element, 'success');
+      
+      // Analyze the extracted text
+      analyzeAndShowTools({
+        text: ocrResult.text,
+        element,
+        position: {
+          x: mousePosition.x,
+          y: mousePosition.y + 20
+        },
+        trigger: 'hover',
+        isOCR: true,
+        ocrConfidence: ocrResult.confidence
+      });
+    } else {
+      console.warn('⚠️ No text found in image');
+      removeImageBadge();
+      hideUI();
+    }
+  } catch (error) {
+    console.error('OCR Error:', error);
+    // Show error or hide UI
+    removeImageBadge();
+    hideUI();
+  }
+}
+
+/**
+ * Show OCR badge on image
+ */
+function showImageBadge(element) {
+  // Remove existing badge
+  removeImageBadge();
+  
+  // Make sure element has position context
+  const computedStyle = window.getComputedStyle(element);
+  const currentPosition = computedStyle.position;
+  if (currentPosition === 'static') {
+    element.style.position = 'relative';
+  }
+  
+  // Add detection class
+  element.classList.add('proactive-ai-ocr-detected');
+  
+  // Create badge
+  const badge = document.createElement('div');
+  badge.className = 'proactive-ai-ocr-badge';
+  badge.title = 'Click to extract text from this image';
+  
+  // Position the badge
+  const rect = element.getBoundingClientRect();
+  badge.style.position = 'fixed';
+  badge.style.top = rect.top + 'px';
+  badge.style.left = rect.left + 'px';
+  badge.style.pointerEvents = 'none';
+  
+  // Add to body
+  document.body.appendChild(badge);
+  currentOCRBadge = badge;
+  
+  console.log('📍 OCR badge added to image');
+}
+
+/**
+ * Update badge state (processing, success, error)
+ */
+function updateImageBadgeState(element, state) {
+  // Remove old state classes
+  element.classList.remove('proactive-ai-ocr-detected', 'proactive-ai-ocr-processing', 'proactive-ai-ocr-success');
+  
+  // Add new state class
+  if (state === 'processing') {
+    element.classList.add('proactive-ai-ocr-processing');
+  } else if (state === 'success') {
+    element.classList.add('proactive-ai-ocr-success');
+    
+    // Auto-remove success state after 2 seconds
+    setTimeout(() => {
+      if (element.classList.contains('proactive-ai-ocr-success')) {
+        element.classList.remove('proactive-ai-ocr-success');
+      }
+    }, 2000);
+  }
+}
+
+/**
+ * Remove OCR badge
+ */
+function removeImageBadge() {
+  if (currentOCRBadge) {
+    currentOCRBadge.remove();
+    currentOCRBadge = null;
+  }
+  
+  // Remove all OCR-related classes from all elements
+  document.querySelectorAll('.proactive-ai-ocr-detected, .proactive-ai-ocr-processing, .proactive-ai-ocr-success').forEach(el => {
+    el.classList.remove('proactive-ai-ocr-detected', 'proactive-ai-ocr-processing', 'proactive-ai-ocr-success');
+  });
 }
 
 /**
@@ -154,7 +307,7 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
 /**
  * Show UI with tools
  */
-function showUI({ tools, content, position, contentTypes, trigger }) {
+function showUI({ tools, content, position, contentTypes, trigger, loading = false, isOCR = false, ocrConfidence = null }) {
   // Send message to injected UI
   window.postMessage({
     type: 'PROACTIVE_AI_SHOW',
@@ -164,7 +317,10 @@ function showUI({ tools, content, position, contentTypes, trigger }) {
       fullContent: content,
       position,
       contentTypes,
-      trigger
+      trigger,
+      loading,
+      isOCR,
+      ocrConfidence
     }
   }, '*');
   

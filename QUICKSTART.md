@@ -67,6 +67,7 @@ You'll see a new `dist/` folder appear.
 - 💻 **Code**: Go to GitHub, select code, click "Explain Code"
 - 🌍 **Translation**: Find foreign text, select it, click "Translate"
 - 📝 **Save**: Select any text, click "Save to Notes"
+- 📷 **NEW - OCR**: Hover over images with text to extract and analyze!
 
 ## 🎓 How to Use
 
