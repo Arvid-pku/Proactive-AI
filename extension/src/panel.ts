@@ -51,6 +51,13 @@ function notify(msg: string) {
 }
 
 function init() {
+  // Ensure chrome API is available
+  if (typeof chrome === "undefined" || !chrome?.storage) {
+    console.error("Chrome API not available in panel context");
+    notify("Extension API not available. Try reloading the extension.");
+    return;
+  }
+
   attachActions();
 
   chrome.storage.local.get({ lastPanelPayload: null, notes: [] }, (d) => {
@@ -81,6 +88,10 @@ function init() {
 init();
 
 async function onSaveKey() {
+  if (!chrome?.storage) {
+    notify("Chrome storage not available");
+    return;
+  }
   const keyInput = $("openai-key") as HTMLInputElement;
   const key = (keyInput.value || "").trim();
   await chrome.storage.local.set({ openaiKey: key });
@@ -88,12 +99,20 @@ async function onSaveKey() {
 }
 
 async function onClearNotes() {
+  if (!chrome?.storage) {
+    notify("Chrome storage not available");
+    return;
+  }
   await chrome.storage.local.set({ notes: [] });
   notify("Notes cleared");
 }
 
 async function ensureKey(): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (!chrome?.storage) {
+      reject(new Error("Chrome storage not available"));
+      return;
+    }
     chrome.storage.local.get({ openaiKey: "" }, (d) => {
       const k = String(d.openaiKey || "");
       if (!k) {

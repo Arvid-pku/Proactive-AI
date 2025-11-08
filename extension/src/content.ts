@@ -114,13 +114,17 @@ async function onActionClick(e: Event) {
       break;
     }
     case "text.save": {
-      const item = { text: selText, url: location.href, ts: Date.now() };
-      chrome.storage.local.get({ notes: [] }, (d) => {
-        const notes = Array.isArray(d.notes) ? d.notes : [];
-        notes.unshift(item);
-        chrome.storage.local.set({ notes });
-        toast("Saved to notes (see side panel)");
-      });
+      if (chrome?.storage?.local) {
+        const item = { text: selText, url: location.href, ts: Date.now() };
+        chrome.storage.local.get({ notes: [] }, (d) => {
+          const notes = Array.isArray(d.notes) ? d.notes : [];
+          notes.unshift(item);
+          chrome.storage.local.set({ notes });
+          toast("Saved to notes (see side panel)");
+        });
+      } else {
+        toast("Storage API not available");
+      }
       break;
     }
     case "dom.edit_toggle": {
@@ -133,11 +137,15 @@ async function onActionClick(e: Event) {
     case "code.run_py":
     case "code.explain":
     case "text.translate": {
-      chrome.runtime.sendMessage({
-        type: "OPEN_SIDE_PANEL",
-        payload: { text: selText, actionId }
-      });
-      toast("Opening side panel...");
+      if (chrome?.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: "OPEN_SIDE_PANEL",
+          payload: { text: selText, actionId }
+        });
+        toast("Opening side panel...");
+      } else {
+        toast("Extension API not available");
+      }
       break;
     }
     default:
