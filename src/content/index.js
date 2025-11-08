@@ -130,7 +130,7 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
       }
     });
     
-    if (response.success) {
+    if (response && response.success) {
       showUI({
         tools: response.tools,
         content: text,
@@ -141,7 +141,13 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
     }
     
   } catch (error) {
-    console.error('Error analyzing content:', error);
+    if (error.message && error.message.includes('Extension context invalidated')) {
+      console.warn('⚠️ Extension was reloaded. Please refresh this page to use the assistant.');
+      // Show a user-friendly message
+      alert('Proactive AI Assistant was updated. Please refresh this page (F5) to continue using it.');
+    } else {
+      console.error('Error analyzing content:', error);
+    }
   }
 }
 
@@ -183,7 +189,7 @@ function hideUI() {
 function injectUI() {
   if (uiInjected) return;
   
-  // Create container
+  // Create container for floating assistant
   const container = document.createElement('div');
   container.id = 'proactive-ai-root';
   document.body.appendChild(container);
@@ -192,6 +198,24 @@ function injectUI() {
   const script = document.createElement('script');
   script.src = chrome.runtime.getURL('ui.js');
   document.head.appendChild(script);
+  
+  // Create floating action button (FAB)
+  const fab = document.createElement('button');
+  fab.id = 'proactive-ai-fab';
+  fab.innerHTML = '✨';
+  fab.title = 'Open AI Assistant Panel';
+  fab.addEventListener('click', async () => {
+    console.log('FAB clicked, opening side panel...');
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL' });
+      if (response && response.success) {
+        console.log('✅ Side panel opened from FAB');
+      }
+    } catch (error) {
+      console.error('Error opening panel from FAB:', error);
+    }
+  });
+  document.body.appendChild(fab);
   
   uiInjected = true;
 }
@@ -220,6 +244,40 @@ window.addEventListener('message', async (event) => {
     const { toolId, content } = event.data.payload;
     
     try {
+      // Special handling for graph_equation - execute first, then open panel
+      if (toolId === 'graph_equation') {
+        console.log('Graphing equation...');
+        
+        // Execute the tool first (parse and save equation)
+        const response = await chrome.runtime.sendMessage({
+          action: 'EXECUTE_TOOL',
+          data: {
+            toolId,
+            content,
+            context: selectedElement ? getContext(selectedElement) : ''
+          }
+        });
+        
+        // Send result back to UI
+        window.postMessage({
+          type: 'PROACTIVE_AI_TOOL_RESULT',
+          payload: response
+        }, '*');
+        
+        // Then automatically open side panel
+        setTimeout(async () => {
+          console.log('Auto-opening side panel for graph...');
+          await chrome.runtime.sendMessage({
+            action: 'OPEN_SIDE_PANEL'
+          }).catch(err => {
+            console.log('Could not auto-open panel, user can click ✨ icon');
+          });
+        }, 1000);
+        
+        return;
+      }
+      
+      // Normal tool execution for other tools
       const response = await chrome.runtime.sendMessage({
         action: 'EXECUTE_TOOL',
         data: {

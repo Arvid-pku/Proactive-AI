@@ -265,6 +265,15 @@
   border: 1px solid #e0e0e0;
   font-family: monospace;
   font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.proactive-ai-result-citation {
+  background: #f0f7ff;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #d0e7ff;
+  margin-bottom: 12px;
 }
 
 .proactive-ai-link-button {
@@ -290,6 +299,33 @@
   border: 1px solid #e0e0e0;
   font-style: italic;
   color: #555;
+}
+
+/* Graph display */
+.proactive-ai-result-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proactive-ai-graph-container {
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.proactive-ai-graph-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  color: #667eea;
+  font-weight: 500;
 }
 
 /* Scrollbar styling */

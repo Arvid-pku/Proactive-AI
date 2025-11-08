@@ -36,6 +36,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
   
+  if (request.action === 'OPEN_SIDE_PANEL') {
+    // Open side panel for the correct window/tab
+    // Prefer the sender's tab/window when available (content script / FAB click)
+    (async () => {
+      try {
+        const openForWindow = async (windowId) => {
+          try {
+            await chrome.sidePanel.open({ windowId });
+            console.log('✅ Side panel opened successfully');
+            sendResponse({ success: true });
+          } catch (error) {
+            console.error('❌ Error opening side panel:', error);
+            sendResponse({ success: false, error: error.message });
+          }
+        };
+        
+        const senderTab = sender?.tab;
+        if (senderTab?.id && senderTab?.windowId) {
+          // Ensure the side panel is enabled and path is set for this tab
+          await chrome.sidePanel.setOptions({
+            tabId: senderTab.id,
+            path: 'sidepanel.html',
+            enabled: true
+          }).catch(() => { /* best-effort */ });
+          
+          await openForWindow(senderTab.windowId);
+        } else {
+          // Fallback to the last focused window
+          const win = await chrome.windows.getLastFocused();
+          await openForWindow(win.id);
+        }
+      } catch (error) {
+        console.error('❌ Unexpected error while opening side panel:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+  
   if (request.action === 'EXECUTE_TOOL') {
     handleToolExecution(request.data).then(sendResponse);
     return true;
@@ -95,17 +134,21 @@ Detected types: ${contentTypes.join(', ')}
 
 Which tools should be shown? Return JSON array of tool IDs only.`;
 
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini', // Using gpt-4o-mini as fastest option (GPT-5 nano not yet in API)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 100
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: systemPrompt }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: userPrompt }]
+        }
+      ]
     });
 
-    const toolIds = JSON.parse(response.choices[0].message.content);
+    const toolIds = JSON.parse(response.output_text);
     
     return { 
       success: true, 
@@ -159,7 +202,13 @@ async function handleToolExecution({ toolId, content, context }) {
       explain_text: () => explainWithAI(content, 'Explain this in simpler terms'),
       save_note: () => saveNote(content),
       define_word: () => explainWithAI(content, 'Define this word or phrase'),
-      pronounce: () => pronounceText(content)
+      pronounce: () => pronounceText(content),
+      visualize_chemical: () => visualizeChemical(content),
+      timeline_view: () => createTimeline(content),
+      export_table: () => exportTableData(content, context),
+      visualize_data: () => visualizeData(content),
+      fetch_citation: () => fetchCitation(content),
+      check_link: () => checkLink(content)
     };
     
     const handler = toolHandlers[toolId];
@@ -183,18 +232,95 @@ async function handleToolExecution({ toolId, content, context }) {
   }
 }
 
-// Helper: Graph equation using Desmos
-function graphEquation(equation) {
-  // Clean equation for Desmos
-  const cleaned = equation.replace(/\\|{|}/g, '').trim();
-  const desmosUrl = `https://www.desmos.com/calculator`;
-  
-  return {
-    type: 'url',
-    url: desmosUrl,
-    equation: cleaned,
-    instruction: 'Opening Desmos graphing calculator. Enter the equation manually or use the pre-filled version.'
-  };
+// Helper: Graph equation using Desmos (opens side panel)
+async function graphEquation(equation) {
+  try {
+    const client = await getOpenAIClient();
+    
+    console.log('Parsing equation for Desmos:', equation);
+    
+    // Use AI to convert equation to Desmos-compatible format
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{
+            type: 'input_text',
+            text: `You are a math equation parser. Convert the given equation to Desmos calculator format.
+Rules:
+- Use y= for functions (e.g., "y=x^2")
+- Use x^2 for powers (not x²)
+- Keep simple format
+- If multiple equations, separate with semicolons
+- Return ONLY the equation(s), no explanation
+Examples:
+Input: "f(x) = x² + 2x + 1" → Output: "y=x^2+2x+1"
+Input: "y = sin(x)" → Output: "y=sin(x)"
+Input: "x² + y² = 25" → Output: "x^2+y^2=25"`
+          }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `Convert to Desmos format: ${equation}` }]
+        }
+      ]
+    });
+    
+    const desmosEquation = response.output_text.trim();
+    console.log('Desmos equation:', desmosEquation);
+    
+    // Store equation in chrome.storage so side panel can read it
+    await chrome.storage.local.set({
+      pendingGraph: {
+        equation: desmosEquation,
+        originalEquation: equation,
+        timestamp: Date.now()
+      }
+    });
+    
+    console.log('✅ Equation saved to storage for side panel');
+    
+    // Try to send to side panel if it's open (will fail if not, but that's OK)
+    setTimeout(() => {
+      chrome.runtime.sendMessage({
+        action: 'GRAPH_EQUATION',
+        equation: desmosEquation,
+        originalEquation: equation
+      }).catch(error => {
+        console.log('Side panel not open yet, equation stored for when it opens');
+      });
+    }, 100);
+    
+    return {
+      type: 'success',
+      message: '📊 Equation ready! Click the ✨ icon or extension icon to view the graph.',
+      equation: desmosEquation,
+      originalEquation: equation
+    };
+  } catch (error) {
+    console.error('Equation parsing error:', error);
+    // Fallback: simple cleaning
+    const cleaned = equation.replace(/\\|{|}/g, '').trim();
+    const desmosEquation = cleaned.includes('=') ? cleaned : `y=${cleaned}`;
+    
+    // Store in storage
+    await chrome.storage.local.set({
+      pendingGraph: {
+        equation: desmosEquation,
+        originalEquation: equation,
+        timestamp: Date.now()
+      }
+    });
+    
+    console.log('✅ Equation saved (fallback)');
+    
+    return {
+      type: 'success',
+      message: '📊 Equation ready! Click the ✨ icon or extension icon to view the graph.',
+      equation: desmosEquation
+    };
+  }
 }
 
 // Helper: Explain using AI
@@ -204,21 +330,25 @@ async function explainWithAI(content, instruction) {
     
     console.log('Calling OpenAI API for:', instruction);
     
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful teacher and tutor.' },
-        { role: 'user', content: `${instruction}:\n\n${content}` }
-      ],
-      temperature: 0.7,
-      max_tokens: 500
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a helpful teacher and tutor.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `${instruction}:\n\n${content}` }]
+        }
+      ]
     });
     
     console.log('OpenAI API response received');
     
     return {
       type: 'text',
-      content: response.choices[0].message.content
+      content: response.output_text
     };
   } catch (error) {
     console.error('OpenAI API error:', error);
@@ -233,21 +363,25 @@ async function translateText(content) {
     
     console.log('Calling OpenAI API for translation');
     
-    const response = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a translator. Detect the language and translate to English. If already in English, translate to Spanish.' },
-        { role: 'user', content: content }
-      ],
-      temperature: 0.3,
-      max_tokens: 300
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a translator. Detect the language and translate to English. If already in English, translate to Spanish.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: content }]
+        }
+      ]
     });
     
     console.log('Translation completed');
     
     return {
       type: 'text',
-      content: response.choices[0].message.content
+      content: response.output_text
     };
   } catch (error) {
     console.error('Translation API error:', error);
@@ -282,6 +416,230 @@ function pronounceText(text) {
     instruction: 'Use browser text-to-speech'
   };
 }
+
+// Helper: Visualize chemical structure
+function visualizeChemical(formula) {
+  // Clean the formula
+  const cleaned = formula.trim().replace(/\s+/g, '');
+  
+  // Use PubChem for 3D visualization
+  const pubchemUrl = `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(cleaned)}`;
+  
+  return {
+    type: 'url',
+    url: pubchemUrl,
+    formula: cleaned,
+    instruction: 'Opening PubChem to visualize the molecular structure. Search for your compound to see 3D structure.'
+  };
+}
+
+// Helper: Create historical timeline
+async function createTimeline(content) {
+  try {
+    const client = await getOpenAIClient();
+    
+    console.log('Creating timeline for historical content');
+    
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a history expert. Create a timeline of events related to the given content. Include dates, events, and brief descriptions.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `Create a timeline for: ${content}` }]
+        }
+      ]
+    });
+    
+    console.log('Timeline created');
+    
+    return {
+      type: 'text',
+      content: response.output_text
+    };
+  } catch (error) {
+    console.error('Timeline creation error:', error);
+    throw new Error(`Timeline creation failed: ${error.message}`);
+  }
+}
+
+// Helper: Export table data as CSV
+function exportTableData(content, context) {
+  try {
+    // Try to parse content as table data
+    // Simple approach: split by newlines and tabs/spaces
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    // Convert to CSV format
+    const csv = lines.map(line => {
+      // Replace multiple spaces/tabs with commas
+      return line.trim().replace(/\s{2,}|\t+/g, ',');
+    }).join('\n');
+    
+    // Create a data URL
+    const blob = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
+    
+    return {
+      type: 'text',
+      content: `Table data ready to export:\n\n${csv}\n\nTo download: Right-click and "Save link as" on the download button in your browser.`,
+      csvData: csv,
+      downloadUrl: blob
+    };
+  } catch (error) {
+    console.error('Export error:', error);
+    return {
+      type: 'text',
+      content: 'Could not parse table data. Please select a properly formatted table.'
+    };
+  }
+}
+
+// Helper: Visualize data with AI assistance
+async function visualizeData(content) {
+  try {
+    const client = await getOpenAIClient();
+    
+    console.log('Analyzing data for visualization');
+    
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a data analyst. Analyze the given tabular data and suggest the best way to visualize it. Describe what type of chart would work best and what insights can be gained.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `Analyze this data:\n\n${content}` }]
+        }
+      ]
+    });
+    
+    console.log('Data analysis completed');
+    
+    return {
+      type: 'text',
+      content: response.output_text + '\n\nTip: You can copy this data to tools like Google Sheets, Excel, or plot.ly for actual visualization.'
+    };
+  } catch (error) {
+    console.error('Data visualization error:', error);
+    throw new Error(`Data analysis failed: ${error.message}`);
+  }
+}
+
+// Helper: Fetch academic citation
+async function fetchCitation(content) {
+  try {
+    const client = await getOpenAIClient();
+    
+    console.log('Fetching citation information');
+    
+    // Check if it's a DOI, arXiv, or citation number
+    const doiMatch = content.match(/10\.\d{4,}\/[^\s]+/);
+    const arxivMatch = content.match(/arXiv:(\d+\.\d+)/i);
+    
+    let url = null;
+    if (doiMatch) {
+      url = `https://doi.org/${doiMatch[0]}`;
+    } else if (arxivMatch) {
+      url = `https://arxiv.org/abs/${arxivMatch[1]}`;
+    }
+    
+    // Use AI to extract/format citation
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are an academic librarian. Extract and format citation information from the given text. Include authors, title, year, journal/conference, and DOI if available.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `Extract citation from: ${content}` }]
+        }
+      ]
+    });
+    
+    console.log('Citation fetched');
+    
+    let result = {
+      type: 'text',
+      content: response.output_text
+    };
+    
+    if (url) {
+      result.type = 'url';
+      result.url = url;
+      result.citation = response.output_text;
+      result.instruction = 'Click to open the paper. Citation details above.';
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Citation fetch error:', error);
+    throw new Error(`Citation lookup failed: ${error.message}`);
+  }
+}
+
+// Helper: Check link safety
+async function checkLink(url) {
+  try {
+    const client = await getOpenAIClient();
+    
+    console.log('Checking link safety');
+    
+    // Extract actual URL if in text
+    const urlMatch = url.match(/https?:\/\/[^\s]+/);
+    const actualUrl = urlMatch ? urlMatch[0] : url;
+    
+    // Parse URL
+    let domain = 'unknown';
+    try {
+      const urlObj = new URL(actualUrl);
+      domain = urlObj.hostname;
+    } catch (e) {
+      domain = 'Invalid URL';
+    }
+    
+    const response = await client.responses.create({
+      model: 'gpt-5-mini',
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a cybersecurity expert. Analyze the given URL and assess its safety. Check the domain, look for suspicious patterns, and provide safety recommendations.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: `Check this URL: ${actualUrl}` }]
+        }
+      ]
+    });
+    
+    console.log('Link check completed');
+    
+    return {
+      type: 'text',
+      content: `Domain: ${domain}\n\n${response.output_text}\n\n⚠️ Always be cautious when clicking unknown links!`
+    };
+  } catch (error) {
+    console.error('Link check error:', error);
+    throw new Error(`Link safety check failed: ${error.message}`);
+  }
+}
+
+// Handle extension icon click - open side panel
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log('Extension icon clicked, opening side panel...');
+  try {
+    await chrome.sidePanel.open({ windowId: tab.windowId });
+    console.log('✅ Side panel opened from extension icon');
+  } catch (error) {
+    console.error('❌ Error opening side panel from icon:', error);
+  }
+});
 
 console.log('Proactive AI Assistant background service worker loaded');
 

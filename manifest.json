@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Proactive AI Assistant",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Intelligent context-aware helper tools powered by AI",
   "permissions": [
     "activeTab",
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.openai.com/*",
@@ -23,9 +24,12 @@
       "run_at": "document_end"
     }
   ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "web_accessible_resources": [
     {
-      "resources": ["ui.html", "ui.js", "ui.css"],
+      "resources": ["ui.html", "ui.js", "ui.css", "icons/icon48.png"],
       "matches": ["<all_urls>"]
     }
   ],
@@ -35,7 +39,6 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
