@@ -10,22 +10,25 @@ import { extractTextFromImage, isImage } from '../utils/ocrHelper.js';
 let mousePosition = { x: 0, y: 0 };
 let selectedElement = null;
 let selectedText = '';
-let debounceTimer = null;
 let uiInjected = false;
 let currentOCRBadge = null;
-let hoveredImageElement = null;
 let currentContentTypes = [];
 let currentMetadata = null;
 let currentOCRBadgeTarget = null;
 let currentOCRBadgeHandler = null;
+let analysisTriggerButton = null;
+let analysisTriggerHandler = null;
+let pendingAnalysis = null;
+let suppressNextClickReset = false;
 
 // Configuration
-const DEBOUNCE_DELAY = 800; // ms to wait before showing UI
 const MIN_TEXT_LENGTH = 3;
 const SUGGESTION_CACHE_TTL = 15000;
 let lastSuggestionKey = null;
 let lastSuggestionResult = null;
 let lastSuggestionTimestamp = 0;
+const TRIGGER_SIZE = 20;
+const TRIGGER_OFFSET = 12;
 
 // Track mouse position
 document.addEventListener('mousemove', (e) => {
@@ -36,38 +39,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', handleSelection);
 document.addEventListener('keyup', handleSelection);
 
-// Track hover with debounce
-document.addEventListener('mouseover', (e) => {
-  clearTimeout(debounceTimer);
-  
-  // Check if hovering over an image
-  if (isImage(e.target)) {
-    hoveredImageElement = e.target;
-    showImageBadge(e.target);
-    return;
-  }
-  
-  debounceTimer = setTimeout(() => {
-    handleHover(e.target);
-  }, DEBOUNCE_DELAY);
-});
-
-document.addEventListener('mouseout', (e) => {
-  clearTimeout(debounceTimer);
-  
-  if (!hoveredImageElement) return;
-  
-  const leftImage =
-    e.target === hoveredImageElement || hoveredImageElement.contains(e.target);
-  const movingToBadge =
-    currentOCRBadge &&
-    (currentOCRBadge === e.relatedTarget || currentOCRBadge.contains(e.relatedTarget));
-  
-  if (leftImage && !movingToBadge) {
-    removeImageBadge();
-    hoveredImageElement = null;
-  }
-});
+document.addEventListener('click', handleDocumentClick, true);
 
 /**
  * Handle text selection
@@ -77,7 +49,9 @@ function handleSelection() {
   const text = selection.toString().trim();
   
   if (text.length >= MIN_TEXT_LENGTH) {
+    suppressNextClickReset = true;
     selectedText = text;
+    removeImageBadge();
     
     // Safety check for selection
     if (!selection.anchorNode) {
@@ -99,52 +73,35 @@ function handleSelection() {
       return;
     }
     
+    if (element.closest && element.closest('#proactive-ai-root')) {
+      return;
+    }
+    
     selectedElement = element;
     
-    analyzeAndShowTools({
+    const triggerPosition = {
+      x: Math.min(rect.right + TRIGGER_OFFSET, window.innerWidth - TRIGGER_OFFSET),
+      y: Math.min(Math.max(rect.top + rect.height / 2, TRIGGER_OFFSET), window.innerHeight - TRIGGER_OFFSET)
+    };
+    
+    pendingAnalysis = {
+      type: 'text',
       text,
       element,
-      position: {
-        x: rect.left + rect.width / 2,
-        y: rect.bottom + 10
-      },
+      position: triggerPosition,
       trigger: 'selection'
+    };
+    
+    showAnalysisTrigger(triggerPosition, {
+      label: '',
+      onActivate: runPendingAnalysis
     });
   } else {
+    selectedText = '';
+    selectedElement = null;
+    pendingAnalysis = null;
+    removeAnalysisTrigger();
     hideUI();
-  }
-}
-
-/**
- * Handle hover over element
- */
-async function handleHover(element) {
-  // Skip if text is selected
-  if (selectedText) return;
-  
-  // Skip UI elements, buttons, etc.
-  if (shouldSkipElement(element)) return;
-  
-  // Check if element is an image
-  if (isImage(element)) {
-    selectedElement = element;
-    return;
-  }
-  
-  const text = extractText(element);
-  
-  if (text.length >= MIN_TEXT_LENGTH && text.length < 2000) {
-    selectedElement = element;
-    
-    analyzeAndShowTools({
-      text,
-      element,
-      position: {
-        x: mousePosition.x,
-        y: mousePosition.y + 20
-      },
-      trigger: 'hover'
-    });
   }
 }
 
@@ -156,6 +113,8 @@ async function runImageOCR(element, triggerPosition = null) {
     console.log('Starting OCR for image after user confirmation...');
     
     selectedElement = element;
+    pendingAnalysis = null;
+    removeAnalysisTrigger();
     
     // Update badge to processing state
     updateImageBadgeState(element, 'processing');
@@ -223,7 +182,7 @@ async function runImageOCR(element, triggerPosition = null) {
 /**
  * Show OCR badge on image
  */
-function showImageBadge(element) {
+function showImageBadge(element, clickPosition = null) {
   // Remove existing badge
   removeImageBadge();
   
@@ -240,12 +199,18 @@ function showImageBadge(element) {
   badge.className = 'proactive-ai-ocr-badge';
   badge.title = 'Click to extract text from this image';
   badge.type = 'button';
-  badge.textContent = 'OCR';
+  badge.textContent = '';
+  badge.setAttribute('aria-label', 'Extract text with AI');
   
   const rect = element.getBoundingClientRect();
+  const baseLeft = rect.left;
+  const baseTop = rect.top;
+  const pointerLeft = clickPosition ? clickPosition.x - TRIGGER_SIZE / 2 : baseLeft;
+  const pointerTop = clickPosition ? clickPosition.y - TRIGGER_SIZE / 2 : baseTop;
+  
   badge.style.position = 'fixed';
-  badge.style.top = rect.top + 'px';
-  badge.style.left = rect.left + 'px';
+  badge.style.top = `${Math.min(Math.max(pointerTop, 4), window.innerHeight - TRIGGER_SIZE - 4)}px`;
+  badge.style.left = `${Math.min(Math.max(pointerLeft, 4), window.innerWidth - TRIGGER_SIZE - 4)}px`;
   badge.style.pointerEvents = 'auto';
   badge.style.cursor = 'pointer';
   
@@ -272,15 +237,21 @@ function updateImageBadgeState(element, state) {
   element.classList.remove('proactive-ai-ocr-detected', 'proactive-ai-ocr-processing', 'proactive-ai-ocr-success');
   
   // Add new state class
+  if (currentOCRBadge && currentOCRBadgeTarget === element) {
+    currentOCRBadge.classList.remove('is-processing', 'is-success');
+  }
+  
   if (state === 'processing') {
     element.classList.add('proactive-ai-ocr-processing');
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.classList.add('is-processing');
       currentOCRBadge.textContent = '...';
       currentOCRBadge.disabled = true;
     }
   } else if (state === 'success') {
     element.classList.add('proactive-ai-ocr-success');
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.classList.add('is-success');
       currentOCRBadge.textContent = '✓';
     }
     
@@ -290,12 +261,14 @@ function updateImageBadgeState(element, state) {
         element.classList.remove('proactive-ai-ocr-success');
       }
       if (currentOCRBadge && currentOCRBadgeTarget === element) {
+        currentOCRBadge.classList.remove('is-processing', 'is-success');
         currentOCRBadge.textContent = 'OCR';
         currentOCRBadge.disabled = false;
       }
     }, 2000);
   } else {
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.classList.remove('is-processing', 'is-success');
       currentOCRBadge.textContent = 'OCR';
       currentOCRBadge.disabled = false;
     }
@@ -322,11 +295,122 @@ function removeImageBadge() {
   });
 }
 
+function showAnalysisTrigger(position, { label = '', onActivate } = {}) {
+  removeAnalysisTrigger();
+  
+  const button = document.createElement('button');
+  button.className = 'proactive-ai-trigger';
+  button.type = 'button';
+  button.title = 'Open AI recommendations';
+  button.setAttribute('aria-label', 'Open AI recommendations');
+  if (label) {
+    button.textContent = label;
+  }
+  
+  const offsetX = Math.min(
+    Math.max(position.x - TRIGGER_SIZE / 2, 4),
+    window.innerWidth - TRIGGER_SIZE - 4
+  );
+  const offsetY = Math.min(
+    Math.max(position.y - TRIGGER_SIZE / 2, 4),
+    window.innerHeight - TRIGGER_SIZE - 4
+  );
+  
+  button.style.position = 'fixed';
+  button.style.left = `${offsetX}px`;
+  button.style.top = `${offsetY}px`;
+  button.style.zIndex = 2147483644;
+  
+  analysisTriggerHandler = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onActivate?.();
+  };
+  
+  button.addEventListener('click', analysisTriggerHandler);
+  document.body.appendChild(button);
+  analysisTriggerButton = button;
+}
+
+function removeAnalysisTrigger() {
+  if (analysisTriggerButton) {
+    if (analysisTriggerHandler) {
+      analysisTriggerButton.removeEventListener('click', analysisTriggerHandler);
+    }
+    analysisTriggerButton.remove();
+    analysisTriggerButton = null;
+    analysisTriggerHandler = null;
+  }
+}
+
+async function runPendingAnalysis() {
+  if (!pendingAnalysis) return;
+  
+  const data = pendingAnalysis;
+  pendingAnalysis = null;
+  removeAnalysisTrigger();
+  
+  if (data.type === 'image') {
+    await runImageOCR(data.element, data.position);
+    return;
+  }
+  
+  analyzeAndShowTools({
+    text: data.text,
+    element: data.element,
+    position: data.position,
+    trigger: data.trigger
+  });
+}
+
+function handleDocumentClick(event) {
+  if (analysisTriggerButton && analysisTriggerButton.contains(event.target)) {
+    return;
+  }
+  if (currentOCRBadge && currentOCRBadge.contains(event.target)) {
+    return;
+  }
+  if (event.target.closest && event.target.closest('#proactive-ai-root')) {
+    return;
+  }
+  
+  if (suppressNextClickReset) {
+    suppressNextClickReset = false;
+    return;
+  }
+  
+  if (isImage(event.target)) {
+    event.preventDefault();
+    event.stopPropagation();
+    selectedText = '';
+    selectedElement = event.target;
+    pendingAnalysis = {
+      type: 'image',
+      element: event.target,
+      position: {
+        x: event.clientX,
+        y: event.clientY
+      },
+      trigger: 'image-click'
+    };
+    showImageBadge(event.target, { x: event.clientX, y: event.clientY });
+    removeAnalysisTrigger();
+    hideUI();
+    return;
+  }
+  
+  if (analysisTriggerButton) {
+    removeAnalysisTrigger();
+    pendingAnalysis = null;
+  }
+}
+
 /**
  * Analyze content and show appropriate tools
  */
 async function analyzeAndShowTools({ text, element, position, trigger, isOCR = false, ocrConfidence = null }) {
   try {
+    pendingAnalysis = null;
     const analysis = analyzeContent(text, element);
     const contentTypes = analysis.types;
     const context = getContext(element);
@@ -445,6 +529,7 @@ function hideUI() {
   window.postMessage({
     type: 'PROACTIVE_AI_HIDE'
   }, '*');
+  removeAnalysisTrigger();
 }
 
 function buildSelectionMetadata({ text, element, analysis, trigger, context, isOCR, ocrConfidence }) {
@@ -537,7 +622,7 @@ function shouldSkipElement(element) {
   if (!element || !element.tagName) return true;
   
   const skipTags = ['SCRIPT', 'STYLE', 'IFRAME', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
-  const skipClasses = ['proactive-ai', 'proactive-ai-root'];
+  const skipClasses = ['proactive-ai', 'proactive-ai-root', 'proactive-ai-trigger'];
   
   if (skipTags.includes(element.tagName)) return true;
   if (skipClasses.some(cls => element.classList?.contains(cls))) return true;

@@ -52,16 +52,15 @@
   box-shadow: 0 20px 40px rgba(182, 131, 85, 0.22);
 }
 
-/* OCR Image Indicator Badge */
+/* AI Trigger Point */
+.proactive-ai-trigger,
 .proactive-ai-ocr-badge {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 32px !important;
-  height: 32px !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  border-radius: 0 0 12px 0 !important;
-  border: 1px solid rgba(68, 54, 42, 0.14) !important;
+  position: fixed !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #f4dac0 41%, #b68355) !important;
+  border: 2px solid rgba(68, 54, 42, 0.18) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -75,12 +74,20 @@
   color: #b68355 !important;
   padding: 0 !important;
   line-height: 1 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.06em !important;
+  border-radius: 50% !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 
+.proactive-ai-trigger:hover,
+.proactive-ai-ocr-badge:hover {
+  transform: scale(1.08);
+  box-shadow: 0 22px 34px rgba(68, 54, 42, 0.3) !important;
+}
+
+.proactive-ai-trigger:focus,
 .proactive-ai-ocr-badge:focus {
   outline: none !important;
+  box-shadow: 0 0 0 2px rgba(182, 131, 85, 0.4) !important;
 }
 
 /* Image with OCR capability - subtle highlight */
@@ -100,21 +107,23 @@
   outline: 2px solid rgba(255, 149, 0, 0.6) !important;
 }
 
-.proactive-ai-ocr-processing .proactive-ai-ocr-badge {
-  color: #ff9500 !important;
-  border-color: rgba(255, 149, 0, 0.3) !important;
-  animation: proactive-ai-spin 1s linear infinite !important;
-}
-
 /* Success state */
 .proactive-ai-ocr-success {
   outline: 2px solid rgba(52, 199, 89, 0.55) !important;
 }
 
-.proactive-ai-ocr-success .proactive-ai-ocr-badge {
+.proactive-ai-ocr-badge.is-processing {
+  color: #ff9500 !important;
+  border-color: rgba(255, 149, 0, 0.3) !important;
+  animation: proactive-ai-spin 1s linear infinite !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #ffe5c2 41%, #ff9500) !important;
+}
+
+.proactive-ai-ocr-badge.is-success {
   color: #34c759 !important;
   border-color: rgba(52, 199, 89, 0.3) !important;
   animation: proactive-ai-bounce 0.6s ease !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #d5f5df 41%, #34c759) !important;
 }
 
 /* Animations */

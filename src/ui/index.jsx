@@ -132,11 +132,25 @@ function ProactiveAI() {
             )}
           </div>
 
-          <div className="proactive-ai-types">
-            {contentTypes.map(type => (
-              <span key={type} className="proactive-ai-type-badge">{type}</span>
-            ))}
-          </div>
+          {(metadata?.detectorSummary?.length || metadata?.language) && (
+            <div className="proactive-ai-context">
+              {metadata?.detectorSummary?.length ? (
+                <div className="proactive-ai-context-section">
+                  <div className="proactive-ai-context-title">Why these tools</div>
+                  <ul className="proactive-ai-context-list">
+                    {metadata.detectorSummary.map((hint, index) => (
+                      <li key={`${hint}-${index}`}>{hint}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {metadata?.language && metadata.language !== 'unknown' && (
+                <div className="proactive-ai-context-meta">
+                  Detected language: <strong>{metadata.language}</strong>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="proactive-ai-tools">
             {tools.map(toolId => {
@@ -177,6 +191,11 @@ function ProactiveAI() {
           </button>
 
           <div className="proactive-ai-result">
+            {metadata?.isOCR && metadata?.ocrConfidence !== undefined && (
+              <div className="proactive-ai-context-meta">
+                OCR confidence: <strong>{Math.round(metadata.ocrConfidence)}%</strong>
+              </div>
+            )}
             {result.type === 'text' && (
               <div className="proactive-ai-result-text">
                 {result.content}
