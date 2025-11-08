@@ -247,8 +247,11 @@ window.addEventListener('message', async (event) => {
       // Special handling for graph_equation - execute first, then open panel
       if (toolId === 'graph_equation') {
         console.log('Graphing equation...');
-        
-        // Execute the tool first (parse and save equation)
+
+        // Immediately request side panel open to preserve user gesture
+        chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL' }).catch(() => {});
+
+        // Then execute the tool (parse and save equation)
         const response = await chrome.runtime.sendMessage({
           action: 'EXECUTE_TOOL',
           data: {
@@ -263,17 +266,7 @@ window.addEventListener('message', async (event) => {
           type: 'PROACTIVE_AI_TOOL_RESULT',
           payload: response
         }, '*');
-        
-        // Then automatically open side panel
-        setTimeout(async () => {
-          console.log('Auto-opening side panel for graph...');
-          await chrome.runtime.sendMessage({
-            action: 'OPEN_SIDE_PANEL'
-          }).catch(err => {
-            console.log('Could not auto-open panel, user can click ✨ icon');
-          });
-        }, 1000);
-        
+
         return;
       }
       

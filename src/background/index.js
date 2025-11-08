@@ -41,32 +41,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Prefer the sender's tab/window when available (content script / FAB click)
     (async () => {
       try {
-        const openForWindow = async (windowId) => {
-          try {
-            await chrome.sidePanel.open({ windowId });
-            console.log('✅ Side panel opened successfully');
-            sendResponse({ success: true });
-          } catch (error) {
-            console.error('❌ Error opening side panel:', error);
-            sendResponse({ success: false, error: error.message });
-          }
-        };
-        
+        // 1) Open ASAP to preserve any user gesture context
+        const windowId = sender?.tab?.windowId ?? (await chrome.windows.getLastFocused()).id;
+        try {
+          await chrome.sidePanel.open({ windowId });
+          console.log('✅ Side panel opened successfully');
+        } catch (error) {
+          console.error('❌ Error opening side panel:', error);
+          sendResponse({ success: false, error: error.message });
+          return;
+        }
+
+        // 2) Best-effort ensure path/options for this tab (non-blocking for open)
         const senderTab = sender?.tab;
-        if (senderTab?.id && senderTab?.windowId) {
-          // Ensure the side panel is enabled and path is set for this tab
+        if (senderTab?.id) {
           await chrome.sidePanel.setOptions({
             tabId: senderTab.id,
             path: 'sidepanel.html',
             enabled: true
           }).catch(() => { /* best-effort */ });
-          
-          await openForWindow(senderTab.windowId);
-        } else {
-          // Fallback to the last focused window
-          const win = await chrome.windows.getLastFocused();
-          await openForWindow(win.id);
         }
+
+        sendResponse({ success: true });
       } catch (error) {
         console.error('❌ Unexpected error while opening side panel:', error);
         sendResponse({ success: false, error: error.message });
@@ -642,4 +638,19 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 console.log('Proactive AI Assistant background service worker loaded');
+
+// Ensure clicking the toolbar icon opens the side panel automatically (where supported)
+try {
+  chrome.sidePanel.setPanelBehavior?.({ openPanelOnActionClick: true });
+} catch (e) {
+  // Ignore if not supported in current Chrome version
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  try {
+    chrome.sidePanel.setPanelBehavior?.({ openPanelOnActionClick: true });
+  } catch (e) {
+    // Ignore if not supported
+  }
+});
 
