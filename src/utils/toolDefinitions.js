@@ -6,7 +6,7 @@ export const TOOL_DEFINITIONS = [
   {
     id: 'graph_equation',
     name: 'Graph Equation',
-    description: 'Visualize mathematical equation using Desmos',
+    description: 'Visualize mathematical equation using Plotly.js',
     icon: '📊',
     contentTypes: ['math'],
     action: 'GRAPH_EQUATION'
