@@ -1,0 +1,277 @@
+/* Popup Styles */
+
+.popup-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #333;
+  background: #f9f9f9;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+.popup-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.popup-subtitle {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.popup-tabs {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.popup-tab {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+}
+
+.popup-tab:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.popup-tab.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+  background: white;
+}
+
+.popup-content {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.popup-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.popup-empty p {
+  margin: 8px 0;
+}
+
+.popup-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.popup-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.popup-button.primary {
+  background: #667eea;
+  color: white;
+}
+
+.popup-button.primary:hover {
+  background: #5568d3;
+}
+
+.popup-button.secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.popup-button.secondary:hover {
+  background: #d0d0d0;
+}
+
+.popup-button.danger {
+  background: #f44336;
+  color: white;
+}
+
+.popup-button.danger:hover {
+  background: #d32f2f;
+}
+
+.popup-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.popup-note {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  transition: box-shadow 0.2s;
+}
+
+.popup-note:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.popup-note-content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #333;
+  margin-bottom: 8px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.popup-note-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.popup-note-date {
+  font-size: 11px;
+  color: #999;
+}
+
+.popup-note-delete {
+  background: transparent;
+  border: none;
+  color: #f44336;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.popup-note-delete:hover {
+  background: #ffebee;
+}
+
+.popup-setting {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.popup-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.popup-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.popup-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.popup-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.popup-instructions,
+.popup-features {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #555;
+}
+
+.popup-instructions li,
+.popup-features li {
+  margin-bottom: 6px;
+}
+
+.popup-footer {
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #999;
+  margin-top: auto;
+}
+
+.popup-footer p {
+  margin: 4px 0;
+}
+
+.popup-version {
+  font-size: 10px;
+  color: #ccc;
+}
+
+/* Scrollbar */
+.popup-content::-webkit-scrollbar,
+.popup-note-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popup-content::-webkit-scrollbar-track,
+.popup-note-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.popup-content::-webkit-scrollbar-thumb,
+.popup-note-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.popup-content::-webkit-scrollbar-thumb:hover,
+.popup-note-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+

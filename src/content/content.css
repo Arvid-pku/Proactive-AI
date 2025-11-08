@@ -1,0 +1,21 @@
+/* Content Script Styles */
+
+#proactive-ai-root {
+  all: initial;
+  position: fixed;
+  z-index: 2147483646;
+  pointer-events: none;
+}
+
+#proactive-ai-root * {
+  pointer-events: auto;
+}
+
+/* Highlight selection effect (optional) */
+.proactive-ai-highlight {
+  background-color: rgba(102, 126, 234, 0.1) !important;
+  outline: 2px solid rgba(102, 126, 234, 0.3);
+  outline-offset: 2px;
+  transition: all 0.2s ease;
+}
+

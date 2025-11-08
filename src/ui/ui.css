@@ -1,0 +1,312 @@
+/* Proactive AI Assistant Styles */
+
+.proactive-ai-container {
+  position: fixed;
+  z-index: 2147483647;
+  width: 320px;
+  max-height: 500px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #333;
+  overflow: hidden;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.proactive-ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.proactive-ai-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.proactive-ai-icon {
+  font-size: 18px;
+}
+
+.proactive-ai-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.proactive-ai-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.proactive-ai-content {
+  padding: 16px;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.proactive-ai-preview {
+  background: #f7f7f7;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.proactive-ai-preview-text {
+  display: inline;
+}
+
+.proactive-ai-preview-more {
+  color: #999;
+  margin-left: 4px;
+}
+
+.proactive-ai-types {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.proactive-ai-type-badge {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.proactive-ai-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proactive-ai-tool-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.proactive-ai-tool-button:hover:not(:disabled) {
+  background: #f9f9f9;
+  border-color: #667eea;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+.proactive-ai-tool-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.proactive-ai-tool-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.proactive-ai-tool-info {
+  flex: 1;
+}
+
+.proactive-ai-tool-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.proactive-ai-tool-desc {
+  font-size: 12px;
+  color: #666;
+}
+
+.proactive-ai-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  color: #667eea;
+  font-weight: 500;
+}
+
+.proactive-ai-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.proactive-ai-back-button {
+  background: #f0f0f0;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 16px;
+  transition: background 0.2s;
+}
+
+.proactive-ai-back-button:hover {
+  background: #e0e0e0;
+}
+
+.proactive-ai-result {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.proactive-ai-result-text {
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.proactive-ai-result-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.proactive-ai-success-icon {
+  font-size: 48px;
+  color: #4caf50;
+}
+
+.proactive-ai-result-meta {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.proactive-ai-result-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  color: #c62828;
+  font-weight: 500;
+}
+
+.proactive-ai-error-icon {
+  font-size: 48px;
+}
+
+.proactive-ai-result-url,
+.proactive-ai-result-audio {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proactive-ai-result-equation {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.proactive-ai-link-button {
+  display: inline-block;
+  background: #667eea;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 500;
+  text-align: center;
+  transition: background 0.2s;
+}
+
+.proactive-ai-link-button:hover {
+  background: #5568d3;
+}
+
+.proactive-ai-audio-text {
+  background: white;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  font-style: italic;
+  color: #555;
+}
+
+/* Scrollbar styling */
+.proactive-ai-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.proactive-ai-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.proactive-ai-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+.proactive-ai-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+

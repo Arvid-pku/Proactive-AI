@@ -1,0 +1,42 @@
+/**
+ * Create simple PNG placeholder icons
+ * These are minimal placeholders - for better icons, use generate-icons.html
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+// Base64 encoded minimal PNG icons (purple with white star)
+const icons = {
+  // 16x16 icon
+  icon16: `iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFJSURBVDiNpZM9SwNBEIafvbvNJWdILoQgKEGwsRGx0N7GP+Ff8Af4C+wEGwsrwcZOUBBBEQQxIIh+gJ1gk0K5XO52bC65S0hQcJvdZd953pnZWfgPMwDGmElgEjgCLoFr59xbP4Pp9wJgBFgH1oDhX/KcUmoXWHfOfQJYAGPMOrAFDAVpX6WUi865t74GAGPMJbATpJumKaVSCSklxhhaWw3atsl1HRaA0+/XfQ1aa6IoQggBgBCCKIrQWgOwC6z2NQBYa3HOYYzBGINzDmstAFrrSSnlNzAIIoqi6Ov5N1JKhBD9DA3n3DOwAtz/vOd5HpVKBc/zALgH1pxzD18NHLAInPyW73kexWKRfD4PwAmw6Jx7+zs0gG3gGJj5KUuWZZTLZQqFAgDHwLZz7utUugEwCxwAM8AIMAP0ADgHDoE959x75p/6BLUCePnBWQ4hAAAAAElFTkSuQmCC`,
+  
+  // 48x48 icon
+  icon48: `iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAOGSURBVGiB7ZlLaBNBGMd/s5vdTZMmTWKqRURBEEQQxKMIXrx58OjJk+BBvHnw5sGbFy+ePHjx4s2LBw+iCIIgCKIIIvhAPKgH8ZFqbZM0Tdo0u7Mz42GTNEl3d7JtKvSH5bAz35f55v++b2YHVlhhhf8KBYAQYhfQBxwEuoFGoBZ4Aj4Cj4AbYEgIsahnQCsAIcRB4DzQ/4/HvcANIcSQlPKhHoGaAIQQu4FL/7G/BPRKKYfVClQtEEIcAy7+x/6nQJ8aebp/+IQQp4HTWsYopUxrNT0BKKUmtJieAHK53JSW8d4AlFJ1Wsb/MwApZQdQp7ZvNYBWrQIopYxSStnVCNRkQgjRrJRqVvOwGkCz2o5VAbRKKeuUUnWqBP6lOqCilLKqEahJoBXYA9QDDuAA5v/W/ABiwDhwH7gHjOhpYiewD2gGFNAOpIAs8AkYBq6llKN6BtoC9AM7dJgaBUaBy8CAEGJGj0A+cBw4BrTpMJUFBoFLUsqrqgUKISqBM8AJwK3D1mdgQEp5RZVAIYQDOAuc0SGsBJ4CN4GbUspHhY1/AIQQFcAF4AhgLGJqHrgGXJRSvtNiowg4Ye07SwmTH4BzUsobhQQ+Ay5QurPsDXBKSvlcrcBr06F0Sh+1FD+gWOAr4KR0Sh/9QPjyCVxUSk2VIvC99AlclFLOljrwrfwNXpJS5kob+F7+BpellPlSBX6Uv8ErUspMKQM/yd/glZQyU4rA7+RvcFlKmS424IP8DV5KKZPFBnyXv8ErKeV0MQGvlL/BiJRyqliA18vfYFRK+a0YgG/kb/BWSjldaMA7+Ru8k1LOFBLwU/kbjEspZwsF+F3+BuNSynfFAExKKd8WAvBB/gbvpZRThQBMSim/6A34Tf4Gn6SUX/UEfJK/wbSUMqYX4Kv8Db5KKb/rAfggf4Mfco4ougJ+kz/XybwF3Mqv8ga4kT+vDXAn/48N0B/gnfx5bYB7+bNRQFf5s1FAd/mzUaBk8meh5JdQSeXPfAmVXP7Ml9BfkT/zJfTX5M98Cf1V+TNfQn9V/syX0F+XP9Ml9E/kz2wJ/TP5s1pC/1T+rJbQv5A/iyX0r+TPWgn9S/mzVEL/Wv4sldC/kT8rJfTv5M9CCf1H+bNQQv9Z/rKX0AdKIH/ZS+hDJZC/rCX0wRLIX9YS+nAJ5C9bCX2kBPKXrYT+BzIje4ej6baUAAAAAElFTkSuQmCC`,
+  
+  // 128x128 icon
+  icon128: `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`
+};
+
+const iconsDir = path.join(__dirname, '../src/icons');
+
+// Ensure directory exists
+if (!fs.existsSync(iconsDir)) {
+  fs.mkdirSync(iconsDir, { recursive: true });
+}
+
+// Create PNG files from base64
+Object.keys(icons).forEach(name => {
+  const buffer = Buffer.from(icons[name], 'base64');
+  const filename = path.join(iconsDir, `${name}.png`);
+  fs.writeFileSync(filename, buffer);
+  console.log(`✓ Created ${name}.png`);
+});
+
+console.log('\n✅ PNG icon placeholders created!');
+console.log('\nNote: These are minimal placeholders.');
+console.log('For better quality icons:');
+console.log('1. Open src/icons/generate-icons.html in your browser');
+console.log('2. Download the high-quality PNG files');
+console.log('3. Replace the placeholder files\n');
+

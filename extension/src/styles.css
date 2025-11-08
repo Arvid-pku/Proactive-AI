@@ -1,6 +1,0 @@
-/* Minimal content stylesheet - intentionally sparse to avoid host CSS conflicts */
-
-html.proactive-editing body[contenteditable="true"] {
-  outline: 2px dashed #2563eb;
-  outline-offset: -2px;
-}

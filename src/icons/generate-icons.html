@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Extension Icons</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+    .icon-preview {
+      display: flex;
+      gap: 30px;
+      margin: 30px 0;
+    }
+    canvas {
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .instructions {
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 Proactive AI Assistant - Icon Generator</h1>
+    <p>Generate extension icons for Chrome Web Store</p>
+    
+    <div class="icon-preview">
+      <div>
+        <p><strong>16x16</strong></p>
+        <canvas id="icon16" width="16" height="16"></canvas>
+      </div>
+      <div>
+        <p><strong>48x48</strong></p>
+        <canvas id="icon48" width="48" height="48"></canvas>
+      </div>
+      <div>
+        <p><strong>128x128</strong></p>
+        <canvas id="icon128" width="128" height="128"></canvas>
+      </div>
+    </div>
+    
+    <button onclick="downloadIcon('icon16', 'icon16.png')">Download 16x16</button>
+    <button onclick="downloadIcon('icon48', 'icon48.png')">Download 48x48</button>
+    <button onclick="downloadIcon('icon128', 'icon128.png')">Download 128x128</button>
+    
+    <div class="instructions">
+      <strong>Instructions:</strong>
+      <ol>
+        <li>Click each download button to save the icon files</li>
+        <li>Place all PNG files in the <code>src/icons/</code> folder</li>
+        <li>Rebuild the extension with <code>npm run build</code></li>
+        <li>Reload the extension in Chrome</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+      const center = size / 2;
+      
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#667eea');
+      gradient.addColorStop(1, '#764ba2');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+      
+      // Draw sparkle/star
+      ctx.fillStyle = '#ffffff';
+      
+      // Scale based on icon size
+      const scale = size / 128;
+      const starSize = 40 * scale;
+      
+      // Draw a sparkle
+      ctx.save();
+      ctx.translate(center, center);
+      
+      // Main star points
+      const points = 4;
+      const outerRadius = starSize;
+      const innerRadius = starSize * 0.4;
+      
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i * Math.PI) / points - Math.PI / 2;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+      
+      // Add smaller sparkles
+      if (size >= 48) {
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.8;
+        
+        // Top right
+        ctx.beginPath();
+        ctx.arc(center * 0.6, -center * 0.5, 3 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bottom left
+        ctx.beginPath();
+        ctx.arc(-center * 0.5, center * 0.6, 2 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw all icons
+    drawIcon(document.getElementById('icon16'));
+    drawIcon(document.getElementById('icon48'));
+    drawIcon(document.getElementById('icon128'));
+    
+    function downloadIcon(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>
+
