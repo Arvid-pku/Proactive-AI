@@ -3,7 +3,7 @@
  * Monitors DOM, tracks mouse position, and manages UI injection
  */
 
-import { analyzeContent, getContext, extractText, detectImage } from '../utils/contentDetectors.js';
+import { analyzeContent, getContext, extractText } from '../utils/contentDetectors.js';
 import { extractTextFromImage, isImage } from '../utils/ocrHelper.js';
 
 // State
@@ -14,10 +14,18 @@ let debounceTimer = null;
 let uiInjected = false;
 let currentOCRBadge = null;
 let hoveredImageElement = null;
+let currentContentTypes = [];
+let currentMetadata = null;
+let currentOCRBadgeTarget = null;
+let currentOCRBadgeHandler = null;
 
 // Configuration
 const DEBOUNCE_DELAY = 800; // ms to wait before showing UI
 const MIN_TEXT_LENGTH = 3;
+const SUGGESTION_CACHE_TTL = 15000;
+let lastSuggestionKey = null;
+let lastSuggestionResult = null;
+let lastSuggestionTimestamp = 0;
 
 // Track mouse position
 document.addEventListener('mousemove', (e) => {
@@ -34,8 +42,9 @@ document.addEventListener('mouseover', (e) => {
   
   // Check if hovering over an image
   if (isImage(e.target)) {
-    showImageBadge(e.target);
     hoveredImageElement = e.target;
+    showImageBadge(e.target);
+    return;
   }
   
   debounceTimer = setTimeout(() => {
@@ -46,8 +55,15 @@ document.addEventListener('mouseover', (e) => {
 document.addEventListener('mouseout', (e) => {
   clearTimeout(debounceTimer);
   
-  // Remove badge when leaving image
-  if (hoveredImageElement && (e.target === hoveredImageElement || hoveredImageElement.contains(e.target))) {
+  if (!hoveredImageElement) return;
+  
+  const leftImage =
+    e.target === hoveredImageElement || hoveredImageElement.contains(e.target);
+  const movingToBadge =
+    currentOCRBadge &&
+    (currentOCRBadge === e.relatedTarget || currentOCRBadge.contains(e.relatedTarget));
+  
+  if (leftImage && !movingToBadge) {
     removeImageBadge();
     hoveredImageElement = null;
   }
@@ -111,7 +127,7 @@ async function handleHover(element) {
   
   // Check if element is an image
   if (isImage(element)) {
-    await handleImageHover(element);
+    selectedElement = element;
     return;
   }
   
@@ -133,11 +149,11 @@ async function handleHover(element) {
 }
 
 /**
- * Handle hover over image element - perform OCR
+ * Perform OCR after explicit user request
  */
-async function handleImageHover(element) {
+async function runImageOCR(element, triggerPosition = null) {
   try {
-    console.log('Image detected, performing OCR...');
+    console.log('Starting OCR for image after user confirmation...');
     
     selectedElement = element;
     
@@ -145,16 +161,29 @@ async function handleImageHover(element) {
     updateImageBadgeState(element, 'processing');
     
     // Show loading indicator
+    const loadingMetadata = {
+      pageTitle: document.title || '',
+      trigger: 'image-ocr',
+      language: detectLanguageHint('', { types: ['image'], diagnostics: [] }),
+      detectorSummary: ['Image element detected (waiting for OCR confirmation).'],
+      sourceUrl: location.href,
+      contentLength: 0,
+      elementTag: element?.tagName || '',
+      timestamp: Date.now(),
+      isOCR: true
+    };
+    
     showUI({
       tools: ['ocr_image'],
       content: 'Analyzing image...',
       position: {
-        x: mousePosition.x,
-        y: mousePosition.y + 20
+        x: triggerPosition?.x ?? mousePosition.x,
+        y: triggerPosition?.y ?? mousePosition.y + 20
       },
       contentTypes: ['image'],
-      trigger: 'hover',
-      loading: true
+      trigger: 'image-ocr',
+      loading: true,
+      metadata: loadingMetadata
     });
     
     // Perform OCR
@@ -171,10 +200,10 @@ async function handleImageHover(element) {
         text: ocrResult.text,
         element,
         position: {
-          x: mousePosition.x,
-          y: mousePosition.y + 20
+          x: triggerPosition?.x ?? mousePosition.x,
+          y: triggerPosition?.y ?? mousePosition.y + 20
         },
-        trigger: 'hover',
+        trigger: 'image-ocr',
         isOCR: true,
         ocrConfidence: ocrResult.confidence
       });
@@ -205,24 +234,32 @@ function showImageBadge(element) {
     element.style.position = 'relative';
   }
   
-  // Add detection class
   element.classList.add('proactive-ai-ocr-detected');
   
-  // Create badge
-  const badge = document.createElement('div');
+  const badge = document.createElement('button');
   badge.className = 'proactive-ai-ocr-badge';
   badge.title = 'Click to extract text from this image';
+  badge.type = 'button';
+  badge.textContent = 'OCR';
   
-  // Position the badge
   const rect = element.getBoundingClientRect();
   badge.style.position = 'fixed';
   badge.style.top = rect.top + 'px';
   badge.style.left = rect.left + 'px';
-  badge.style.pointerEvents = 'none';
+  badge.style.pointerEvents = 'auto';
+  badge.style.cursor = 'pointer';
   
-  // Add to body
+  const handler = (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    runImageOCR(element, { x: event.clientX, y: event.clientY });
+  };
+  badge.addEventListener('click', handler);
+  
   document.body.appendChild(badge);
   currentOCRBadge = badge;
+  currentOCRBadgeTarget = element;
+  currentOCRBadgeHandler = handler;
   
   console.log('OCR badge added to image');
 }
@@ -237,15 +274,31 @@ function updateImageBadgeState(element, state) {
   // Add new state class
   if (state === 'processing') {
     element.classList.add('proactive-ai-ocr-processing');
+    if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.textContent = '...';
+      currentOCRBadge.disabled = true;
+    }
   } else if (state === 'success') {
     element.classList.add('proactive-ai-ocr-success');
+    if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.textContent = '✓';
+    }
     
     // Auto-remove success state after 2 seconds
     setTimeout(() => {
       if (element.classList.contains('proactive-ai-ocr-success')) {
         element.classList.remove('proactive-ai-ocr-success');
       }
+      if (currentOCRBadge && currentOCRBadgeTarget === element) {
+        currentOCRBadge.textContent = 'OCR';
+        currentOCRBadge.disabled = false;
+      }
     }, 2000);
+  } else {
+    if (currentOCRBadge && currentOCRBadgeTarget === element) {
+      currentOCRBadge.textContent = 'OCR';
+      currentOCRBadge.disabled = false;
+    }
   }
 }
 
@@ -254,8 +307,13 @@ function updateImageBadgeState(element, state) {
  */
 function removeImageBadge() {
   if (currentOCRBadge) {
+    if (currentOCRBadgeHandler) {
+      currentOCRBadge.removeEventListener('click', currentOCRBadgeHandler);
+    }
     currentOCRBadge.remove();
     currentOCRBadge = null;
+    currentOCRBadgeHandler = null;
+    currentOCRBadgeTarget = null;
   }
   
   // Remove all OCR-related classes from all elements
@@ -267,21 +325,50 @@ function removeImageBadge() {
 /**
  * Analyze content and show appropriate tools
  */
-async function analyzeAndShowTools({ text, element, position, trigger }) {
+async function analyzeAndShowTools({ text, element, position, trigger, isOCR = false, ocrConfidence = null }) {
   try {
-    // Detect content types
-    const contentTypes = analyzeContent(text, element);
+    const analysis = analyzeContent(text, element);
+    const contentTypes = analysis.types;
     const context = getContext(element);
-    
-    // Get AI suggestions for tools
-    const response = await chrome.runtime.sendMessage({
-      action: 'GET_TOOL_SUGGESTIONS',
-      data: {
-        content: text.slice(0, 500), // Limit text size
-        context: context,
-        contentTypes
-      }
+    const metadata = buildSelectionMetadata({
+      text,
+      element,
+      analysis,
+      trigger,
+      context,
+      isOCR,
+      ocrConfidence
     });
+    
+    const requestPayload = {
+      content: text.slice(0, 500),
+      context: context.slice(-1000),
+      contentTypes,
+      metadata
+    };
+    
+    const cacheKey = JSON.stringify({
+      content: requestPayload.content,
+      context: requestPayload.context,
+      types: contentTypes
+    });
+    
+    let response = null;
+    const now = Date.now();
+    if (cacheKey === lastSuggestionKey && now - lastSuggestionTimestamp < SUGGESTION_CACHE_TTL && lastSuggestionResult) {
+      response = { ...lastSuggestionResult, cached: true };
+    } else {
+      response = await chrome.runtime.sendMessage({
+        action: 'GET_TOOL_SUGGESTIONS',
+        data: requestPayload
+      });
+      
+      if (response && response.success) {
+        lastSuggestionKey = cacheKey;
+        lastSuggestionResult = response;
+        lastSuggestionTimestamp = now;
+      }
+    }
     
     if (response && response.success) {
       showUI({
@@ -289,7 +376,10 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
         content: text,
         position,
         contentTypes,
-        trigger
+        trigger,
+        metadata,
+        isOCR,
+        ocrConfidence
       });
     }
     
@@ -307,7 +397,24 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
 /**
  * Show UI with tools
  */
-function showUI({ tools, content, position, contentTypes, trigger, loading = false, isOCR = false, ocrConfidence = null }) {
+function showUI({
+  tools,
+  content,
+  position,
+  contentTypes,
+  trigger,
+  loading = false,
+  isOCR = false,
+  ocrConfidence = null,
+  metadata = null
+}) {
+  if (Array.isArray(contentTypes)) {
+    currentContentTypes = contentTypes;
+  }
+  if (metadata) {
+    currentMetadata = metadata;
+  }
+  
   // Send message to injected UI
   window.postMessage({
     type: 'PROACTIVE_AI_SHOW',
@@ -320,7 +427,8 @@ function showUI({ tools, content, position, contentTypes, trigger, loading = fal
       trigger,
       loading,
       isOCR,
-      ocrConfidence
+      ocrConfidence,
+      metadata: metadata || currentMetadata
     }
   }, '*');
   
@@ -337,6 +445,52 @@ function hideUI() {
   window.postMessage({
     type: 'PROACTIVE_AI_HIDE'
   }, '*');
+}
+
+function buildSelectionMetadata({ text, element, analysis, trigger, context, isOCR, ocrConfidence }) {
+  const language = detectLanguageHint(text, analysis);
+  const metadata = {
+    pageTitle: document.title || '',
+    language,
+    detectorSummary: analysis.diagnostics,
+    trigger,
+    sourceUrl: location.href,
+    contentLength: text.length,
+    elementTag: element?.tagName || '',
+    timestamp: Date.now(),
+    contextSnippet: context.slice(-300)
+  };
+  
+  if (isOCR) {
+    metadata.isOCR = true;
+    if (ocrConfidence !== null && ocrConfidence !== undefined) {
+      metadata.ocrConfidence = Number(ocrConfidence.toFixed(2));
+    }
+  }
+  
+  const elementLang = element?.getAttribute?.('lang');
+  if (elementLang) {
+    metadata.elementLanguage = elementLang;
+  }
+  
+  return metadata;
+}
+
+function detectLanguageHint(text, analysis) {
+  const docLang = document.documentElement?.lang;
+  const navigatorLang = navigator.language;
+  let hint = docLang || navigatorLang || '';
+  
+  if (analysis.types.includes('foreign')) {
+    const nonLatinHint = containsNonLatin(text) ? 'non-Latin characters detected' : 'foreign language detected';
+    hint = hint ? `${hint}; ${nonLatinHint}` : nonLatinHint;
+  }
+  
+  return hint || 'unknown';
+}
+
+function containsNonLatin(text) {
+  return /[^\u0000-\u007f]/.test(text);
 }
 
 /**
@@ -397,7 +551,14 @@ function shouldSkipElement(element) {
  */
 window.addEventListener('message', async (event) => {
   if (event.data.type === 'PROACTIVE_AI_EXECUTE_TOOL') {
-    const { toolId, content } = event.data.payload;
+    const { toolId, content, metadata: providedMetadata, contentTypes: providedTypes } = event.data.payload;
+    
+    if (Array.isArray(providedTypes)) {
+      currentContentTypes = providedTypes;
+    }
+    if (providedMetadata) {
+      currentMetadata = providedMetadata;
+    }
     
     try {
       // Special handling for graph_equation - execute first, then open panel
@@ -408,12 +569,18 @@ window.addEventListener('message', async (event) => {
         chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL' }).catch(() => {});
 
         // Then execute the tool (parse and save equation)
+        const executionContext = selectedElement ? getContext(selectedElement) : '';
+        const metadata = currentMetadata
+          ? { ...currentMetadata, contextSnippet: executionContext.slice(-300) }
+          : null;
         const response = await chrome.runtime.sendMessage({
           action: 'EXECUTE_TOOL',
           data: {
             toolId,
             content,
-            context: selectedElement ? getContext(selectedElement) : ''
+            context: executionContext,
+            contentTypes: currentContentTypes,
+            metadata
           }
         });
         
@@ -427,12 +594,18 @@ window.addEventListener('message', async (event) => {
       }
       
       // Normal tool execution for other tools
+      const executionContext = selectedElement ? getContext(selectedElement) : '';
+      const metadata = currentMetadata
+        ? { ...currentMetadata, contextSnippet: executionContext.slice(-300) }
+        : null;
       const response = await chrome.runtime.sendMessage({
         action: 'EXECUTE_TOOL',
         data: {
           toolId,
           content,
-          context: selectedElement ? getContext(selectedElement) : ''
+          context: executionContext,
+          contentTypes: currentContentTypes,
+          metadata
         }
       });
       

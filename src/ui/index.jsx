@@ -19,6 +19,7 @@ function ProactiveAI() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState('tools'); // 'tools' or 'result'
+  const [metadata, setMetadata] = useState(null);
   
   const containerRef = useRef(null);
 
@@ -26,17 +27,29 @@ function ProactiveAI() {
     // Listen for messages from content script
     const handleMessage = (event) => {
       if (event.data.type === 'PROACTIVE_AI_SHOW') {
-        const { tools, content, fullContent, position, contentTypes } = event.data.payload;
+        const {
+          tools,
+          content,
+          fullContent,
+          position,
+          contentTypes,
+          metadata,
+          loading
+        } = event.data.payload;
         setTools(tools);
         setContent(content);
         setFullContent(fullContent);
         setPosition(adjustPosition(position));
         setContentTypes(contentTypes);
+        setMetadata(metadata || null);
+        setLoading(Boolean(loading));
         setIsVisible(true);
         setActiveView('tools');
         setResult(null);
       } else if (event.data.type === 'PROACTIVE_AI_HIDE') {
         setIsVisible(false);
+        setMetadata(null);
+        setLoading(false);
       } else if (event.data.type === 'PROACTIVE_AI_TOOL_RESULT') {
         setLoading(false);
         if (event.data.payload.success) {
@@ -75,7 +88,9 @@ function ProactiveAI() {
       type: 'PROACTIVE_AI_EXECUTE_TOOL',
       payload: {
         toolId,
-        content: fullContent
+        content: fullContent,
+        metadata,
+        contentTypes
       }
     }, '*');
   };

@@ -129,26 +129,53 @@ export function detectImage(element) {
 // Determine content type priority
 export function analyzeContent(text, element) {
   const types = [];
+  const diagnostics = [];
   
-  // Check for image first
   if (detectImage(element)) {
     types.push('image');
-    return types; // For images, return early
+    diagnostics.push('Image element detected via tag, background, canvas, or SVG.');
+    return { types, diagnostics };
   }
   
-  if (detectMath(text)) types.push('math');
-  if (detectCode(text)) types.push('code');
-  if (detectForeignLanguage(text)) types.push('foreign');
-  if (detectChemical(text)) types.push('chemical');
-  if (detectHistorical(text)) types.push('historical');
-  if (detectTable(element)) types.push('table');
-  if (detectCitation(text)) types.push('citation');
-  if (detectURL(text)) types.push('url');
+  if (detectMath(text)) {
+    types.push('math');
+    diagnostics.push('Mathematical notation detected (operators, functions, or LaTeX).');
+  }
+  if (detectCode(text)) {
+    types.push('code');
+    diagnostics.push('Code keywords or syntax elements detected.');
+  }
+  if (detectForeignLanguage(text)) {
+    types.push('foreign');
+    diagnostics.push('Non-Latin or accented characters detected.');
+  }
+  if (detectChemical(text)) {
+    types.push('chemical');
+    diagnostics.push('Chemical formulas or terminology detected.');
+  }
+  if (detectHistorical(text)) {
+    types.push('historical');
+    diagnostics.push('Historical dates or keywords detected.');
+  }
+  if (detectTable(element)) {
+    types.push('table');
+    diagnostics.push('Table structure detected in DOM.');
+  }
+  if (detectCitation(text)) {
+    types.push('citation');
+    diagnostics.push('Citation markers (DOI, arXiv, [1], etc.) detected.');
+  }
+  if (detectURL(text)) {
+    types.push('url');
+    diagnostics.push('URL detected in the selection.');
+  }
   
-  // Default to general text
-  if (types.length === 0) types.push('text');
+  if (types.length === 0) {
+    types.push('text');
+    diagnostics.push('Defaulted to general text content.');
+  }
   
-  return types;
+  return { types, diagnostics };
 }
 
 // Get surrounding context
@@ -156,6 +183,30 @@ export function getContext(element, maxLength = 500) {
   if (!element) return '';
   
   let context = '';
+  
+  const structuralSnippets = [];
+  
+  const heading = element.closest?.('h1, h2, h3, h4, h5, h6');
+  if (heading?.innerText) {
+    structuralSnippets.push(`Heading: ${heading.innerText.trim()}`);
+  }
+  
+  if (element.alt) {
+    structuralSnippets.push(`Alt text: ${element.alt.trim()}`);
+  }
+  
+  const labelledAncestor = element.closest?.('[aria-label]');
+  if (labelledAncestor) {
+    structuralSnippets.push(`Aria label: ${labelledAncestor.getAttribute('aria-label')}`);
+  }
+  
+  const figureCaption = element.closest?.('figure');
+  if (figureCaption) {
+    const caption = figureCaption.querySelector('figcaption');
+    if (caption?.innerText) {
+      structuralSnippets.push(`Caption: ${caption.innerText.trim()}`);
+    }
+  }
   
   // Get parent context
   let parent = element.parentElement;
@@ -173,7 +224,8 @@ export function getContext(element, maxLength = 500) {
     }
   }
   
-  return context.trim().slice(-maxLength);
+  const combined = [...structuralSnippets, context.trim()].filter(Boolean).join('\n');
+  return combined.slice(-maxLength);
 }
 
 // Extract clean text from element
@@ -188,4 +240,3 @@ export function extractText(element) {
   // For elements
   return element.innerText || element.textContent || '';
 }
-
