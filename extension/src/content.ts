@@ -119,7 +119,7 @@ async function onActionClick(e: Event) {
         const notes = Array.isArray(d.notes) ? d.notes : [];
         notes.unshift(item);
         chrome.storage.local.set({ notes });
-        toast("Saved to notes");
+        toast("Saved to notes (see side panel)");
       });
       break;
     }

@@ -22,13 +22,36 @@
       <div class="actions" style="margin-top:8px;">
         <button id="btn-graph">Graph</button>
         <button id="btn-explain">Explain</button>
+        <select id="translate-target" style="margin-right:6px;">
+          <option value="en">English</option>
+          <option value="zh">Chinese</option>
+          <option value="ja">Japanese</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+        </select>
         <button id="btn-translate">Translate</button>
       </div>
     </div>
 
     <div class="card">
+      <div class="label">AI result</div>
+      <div id="ai-result" class="value">—</div>
+    </div>
+
+    <div class="card">
       <div class="label">Notes</div>
       <ul id="notes" class="notes"></ul>
+      <div style="margin-top:8px;"><button id="btn-clear-notes">Clear notes</button></div>
+    </div>
+
+    <div class="card">
+      <div class="label">Settings</div>
+      <div style="margin-top:6px;">
+        <input id="openai-key" type="password" placeholder="OpenAI API Key" style="width:70%;padding:6px;border-radius:6px;border:1px solid #1f2937;background:#0b1220;color:#e5e7eb;" />
+        <button id="btn-save-key" style="margin-left:6px;">Save Key</button>
+      </div>
+      <div style="margin-top:6px;color:#9ca3af;font-size:12px;">Key is stored locally in extension storage (not synced).</div>
     </div>
 
     <script type="module" src="src/panel.ts"></script>

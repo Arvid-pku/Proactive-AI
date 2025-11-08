@@ -4,6 +4,7 @@ function $(id: string) {
 
 const lastTextEl = $("last-text");
 const notesList = $("notes");
+const aiResultEl = $("ai-result");
 
 function renderNotes(items: Array<{ text: string; url: string; ts: number }>) {
   notesList.innerHTML = "";
@@ -27,8 +28,10 @@ function setLastText(value: string) {
 
 function attachActions() {
   $("btn-graph").addEventListener("click", () => notify("Graph action coming soon"));
-  $("btn-explain").addEventListener("click", () => notify("Explain action coming soon"));
-  $("btn-translate").addEventListener("click", () => notify("Translate action coming soon"));
+  $("btn-explain").addEventListener("click", onExplainClick);
+  $("btn-translate").addEventListener("click", onTranslateClick);
+  $("btn-save-key").addEventListener("click", onSaveKey);
+  $("btn-clear-notes").addEventListener("click", onClearNotes);
 }
 
 function notify(msg: string) {
@@ -56,6 +59,12 @@ function init() {
     renderNotes(Array.isArray(d.notes) ? d.notes : []);
   });
 
+  // Pre-fill key field if stored
+  chrome.storage.local.get({ openaiKey: "" }, (d) => {
+    const keyInput = $("openai-key") as HTMLInputElement;
+    keyInput.value = String(d.openaiKey || "");
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (changes.lastPanelPayload) {
@@ -70,3 +79,98 @@ function init() {
 }
 
 init();
+
+async function onSaveKey() {
+  const keyInput = $("openai-key") as HTMLInputElement;
+  const key = (keyInput.value || "").trim();
+  await chrome.storage.local.set({ openaiKey: key });
+  notify(key ? "API key saved" : "API key cleared");
+}
+
+async function onClearNotes() {
+  await chrome.storage.local.set({ notes: [] });
+  notify("Notes cleared");
+}
+
+async function ensureKey(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get({ openaiKey: "" }, (d) => {
+      const k = String(d.openaiKey || "");
+      if (!k) {
+        notify("Set OpenAI key in Settings");
+        reject(new Error("Missing OpenAI key"));
+      } else {
+        resolve(k);
+      }
+    });
+  });
+}
+
+async function onTranslateClick() {
+  const text = String(lastTextEl.textContent || "");
+  if (!text || text === "—") {
+    notify("No selection");
+    return;
+  }
+  const target = (document.getElementById("translate-target") as HTMLSelectElement).value || "en";
+  try {
+    aiResultEl.textContent = "Translating...";
+    const key = await ensureKey();
+    const result = await callOpenAI({
+      key,
+      system: `You translate text. Detect source language and translate to ${target}. Reply with translation only.`,
+      user: text,
+      temperature: 0.2,
+    });
+    aiResultEl.textContent = result || "(empty)";
+  } catch (e: any) {
+    aiResultEl.textContent = `Error: ${e?.message || e}`;
+  }
+}
+
+async function onExplainClick() {
+  const text = String(lastTextEl.textContent || "");
+  if (!text || text === "—") {
+    notify("No selection");
+    return;
+  }
+  try {
+    aiResultEl.textContent = "Explaining...";
+    const key = await ensureKey();
+    const result = await callOpenAI({
+      key,
+      system: `You are a concise explainer. If code, explain step by step with key ideas. If math, explain concepts and steps. Keep it under 10 bullet points.`,
+      user: text,
+      temperature: 0.2,
+    });
+    aiResultEl.textContent = result || "(empty)";
+  } catch (e: any) {
+    aiResultEl.textContent = `Error: ${e?.message || e}`;
+  }
+}
+
+async function callOpenAI(params: { key: string; system: string; user: string; temperature?: number }): Promise<string> {
+  const { key, system, user, temperature = 0 } = params;
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      temperature,
+    }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`OpenAI error ${resp.status}: ${text}`);
+  }
+  const data = await resp.json();
+  const content = data?.choices?.[0]?.message?.content ?? "";
+  return String(content || "").trim();
+}
