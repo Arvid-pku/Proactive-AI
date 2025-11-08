@@ -103,8 +103,7 @@ function ProactiveAI() {
     >
       <div className="proactive-ai-header">
         <div className="proactive-ai-title">
-          <span className="proactive-ai-icon">✨</span>
-          <span>AI Assistant</span>
+          <span>Proactive Assistant</span>
         </div>
         <button className="proactive-ai-close" onClick={handleClose}>×</button>
       </div>
@@ -128,7 +127,6 @@ function ProactiveAI() {
             {tools.map(toolId => {
               const tool = getToolDetails(toolId);
               if (!tool) return null;
-              
               return (
                 <button
                   key={toolId}
@@ -136,7 +134,6 @@ function ProactiveAI() {
                   onClick={() => handleToolClick(toolId)}
                   disabled={loading}
                 >
-                  <span className="proactive-ai-tool-icon">{tool.icon}</span>
                   <div className="proactive-ai-tool-info">
                     <div className="proactive-ai-tool-name">{tool.name}</div>
                     <div className="proactive-ai-tool-desc">{tool.description}</div>
@@ -177,7 +174,7 @@ function ProactiveAI() {
                       className="proactive-ai-link-button"
                       style={{ display: 'inline-block', marginTop: '8px' }}
                     >
-                      📥 Download CSV
+                      Download CSV
                     </a>
                   </div>
                 )}
@@ -186,7 +183,6 @@ function ProactiveAI() {
 
             {result.type === 'success' && (
               <div className="proactive-ai-result-success">
-                <span className="proactive-ai-success-icon">✓</span>
                 <div>{result.message}</div>
                 {result.count && <div className="proactive-ai-result-meta">Total notes: {result.count}</div>}
               </div>
@@ -237,7 +233,6 @@ function ProactiveAI() {
 
             {result.type === 'error' && (
               <div className="proactive-ai-result-error">
-                <span className="proactive-ai-error-icon">⚠️</span>
                 <div>{result.message}</div>
               </div>
             )}
@@ -288,7 +283,7 @@ function PlotlyGraph({ graph }) {
         }
       );
     } catch (error) {
-      console.error('❌ Error rendering Plotly preview:', error);
+      console.error('Error rendering Plotly preview:', error);
     }
 
     return () => {
@@ -320,5 +315,3 @@ const root = document.getElementById('proactive-ai-root');
 if (root) {
   ReactDOM.createRoot(root).render(<ProactiveAI />);
 }
-
-

@@ -18,7 +18,7 @@ async function getWorker() {
   if (workerPromise) return workerPromise;
   
   workerPromise = (async () => {
-    console.log('🔧 Initializing Tesseract.js worker...');
+    console.log('Initializing Tesseract.js worker...');
     const newWorker = await Tesseract.createWorker('eng', 1, {
       logger: (m) => {
         if (m.status === 'recognizing text') {
@@ -27,7 +27,7 @@ async function getWorker() {
       }
     });
     worker = newWorker;
-    console.log('✅ Tesseract.js worker ready');
+    console.log('Tesseract.js worker ready');
     return newWorker;
   })();
   
@@ -41,14 +41,14 @@ async function getWorker() {
  */
 export async function performOCR(imageSource) {
   try {
-    console.log('🔍 Starting OCR...');
+    console.log('Starting OCR...');
     
     const tesseractWorker = await getWorker();
     
     // Perform OCR
     const { data } = await tesseractWorker.recognize(imageSource);
     
-    console.log('✅ OCR completed');
+    console.log('OCR completed');
     console.log('Extracted text:', data.text);
     console.log('Confidence:', data.confidence);
     
@@ -59,7 +59,7 @@ export async function performOCR(imageSource) {
       lines: data.lines?.length || 0
     };
   } catch (error) {
-    console.error('❌ OCR Error:', error);
+    console.error('OCR Error:', error);
     throw new Error(`OCR failed: ${error.message}`);
   }
 }
@@ -126,7 +126,7 @@ export async function extractTextFromImage(element) {
     throw new Error('Could not get image source');
   }
   
-  console.log('📷 Extracting text from image:', imageSource.substring(0, 100));
+  console.log('Extracting text from image:', imageSource.substring(0, 100));
   
   const result = await performOCR(imageSource);
   
@@ -142,7 +142,7 @@ export async function extractTextFromImage(element) {
  */
 export async function cleanupOCR() {
   if (worker) {
-    console.log('🧹 Terminating Tesseract worker...');
+    console.log('Terminating Tesseract worker...');
     await worker.terminate();
     worker = null;
     workerPromise = null;

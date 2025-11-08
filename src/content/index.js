@@ -137,7 +137,7 @@ async function handleHover(element) {
  */
 async function handleImageHover(element) {
   try {
-    console.log('🖼️ Image detected, performing OCR...');
+    console.log('Image detected, performing OCR...');
     
     selectedElement = element;
     
@@ -161,7 +161,7 @@ async function handleImageHover(element) {
     const ocrResult = await extractTextFromImage(element);
     
     if (ocrResult && ocrResult.text) {
-      console.log(`✅ OCR found ${ocrResult.words} words (confidence: ${ocrResult.confidence.toFixed(1)}%)`);
+      console.log(`OCR found ${ocrResult.words} words (confidence: ${ocrResult.confidence.toFixed(1)}%)`);
       
       // Update badge to success state
       updateImageBadgeState(element, 'success');
@@ -179,7 +179,7 @@ async function handleImageHover(element) {
         ocrConfidence: ocrResult.confidence
       });
     } else {
-      console.warn('⚠️ No text found in image');
+      console.warn('No text found in image');
       removeImageBadge();
       hideUI();
     }
@@ -224,7 +224,7 @@ function showImageBadge(element) {
   document.body.appendChild(badge);
   currentOCRBadge = badge;
   
-  console.log('📍 OCR badge added to image');
+  console.log('OCR badge added to image');
 }
 
 /**
@@ -295,7 +295,7 @@ async function analyzeAndShowTools({ text, element, position, trigger }) {
     
   } catch (error) {
     if (error.message && error.message.includes('Extension context invalidated')) {
-      console.warn('⚠️ Extension was reloaded. Please refresh this page to use the assistant.');
+      console.warn('Extension was reloaded. Please refresh this page to use the assistant.');
       // Show a user-friendly message
       alert('Proactive AI Assistant was updated. Please refresh this page (F5) to continue using it.');
     } else {
@@ -358,14 +358,14 @@ function injectUI() {
   // Create floating action button (FAB)
   const fab = document.createElement('button');
   fab.id = 'proactive-ai-fab';
-  fab.innerHTML = '✨';
+  fab.innerHTML = 'AI';
   fab.title = 'Open AI Assistant Panel';
   fab.addEventListener('click', async () => {
     console.log('FAB clicked, opening side panel...');
     try {
       const response = await chrome.runtime.sendMessage({ action: 'OPEN_SIDE_PANEL' });
       if (response && response.success) {
-        console.log('✅ Side panel opened from FAB');
+        console.log('Side panel opened from FAB');
       }
     } catch (error) {
       console.error('Error opening panel from FAB:', error);
@@ -476,4 +476,3 @@ function handleToolResult(result, toolId) {
 }
 
 console.log('Proactive AI Assistant content script loaded');
-

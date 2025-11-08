@@ -7,7 +7,6 @@ export const TOOL_DEFINITIONS = [
     id: 'ocr_image',
     name: 'Extract Text (OCR)',
     description: 'Extract text from image',
-    icon: '📷',
     contentTypes: ['image'],
     action: 'OCR_IMAGE'
   },
@@ -15,7 +14,6 @@ export const TOOL_DEFINITIONS = [
     id: 'graph_equation',
     name: 'Graph Equation',
     description: 'Visualize mathematical equation using Plotly.js',
-    icon: '📊',
     contentTypes: ['math'],
     action: 'GRAPH_EQUATION'
   },
@@ -23,7 +21,6 @@ export const TOOL_DEFINITIONS = [
     id: 'explain_math',
     name: 'Explain Math',
     description: 'Get step-by-step explanation',
-    icon: '🧮',
     contentTypes: ['math'],
     action: 'EXPLAIN_MATH'
   },
@@ -31,7 +28,6 @@ export const TOOL_DEFINITIONS = [
     id: 'solve_equation',
     name: 'Solve Equation',
     description: 'Find solutions to the equation',
-    icon: '✓',
     contentTypes: ['math'],
     action: 'SOLVE_EQUATION'
   },
@@ -39,7 +35,6 @@ export const TOOL_DEFINITIONS = [
     id: 'explain_code',
     name: 'Explain Code',
     description: 'Understand what this code does',
-    icon: '💡',
     contentTypes: ['code'],
     action: 'EXPLAIN_CODE'
   },
@@ -47,7 +42,6 @@ export const TOOL_DEFINITIONS = [
     id: 'debug_code',
     name: 'Debug Code',
     description: 'Find and fix potential issues',
-    icon: '🐛',
     contentTypes: ['code'],
     action: 'DEBUG_CODE'
   },
@@ -55,7 +49,6 @@ export const TOOL_DEFINITIONS = [
     id: 'improve_code',
     name: 'Improve Code',
     description: 'Suggest optimizations',
-    icon: '⚡',
     contentTypes: ['code'],
     action: 'IMPROVE_CODE'
   },
@@ -63,7 +56,6 @@ export const TOOL_DEFINITIONS = [
     id: 'translate',
     name: 'Translate',
     description: 'Translate to other languages',
-    icon: '🌍',
     contentTypes: ['text', 'foreign'],
     action: 'TRANSLATE'
   },
@@ -71,7 +63,6 @@ export const TOOL_DEFINITIONS = [
     id: 'summarize',
     name: 'Summarize',
     description: 'Get a concise summary',
-    icon: '📝',
     contentTypes: ['text'],
     action: 'SUMMARIZE'
   },
@@ -79,7 +70,6 @@ export const TOOL_DEFINITIONS = [
     id: 'explain_text',
     name: 'Explain',
     description: 'Explain in simpler terms',
-    icon: '💬',
     contentTypes: ['text'],
     action: 'EXPLAIN_TEXT'
   },
@@ -87,7 +77,6 @@ export const TOOL_DEFINITIONS = [
     id: 'save_note',
     name: 'Save to Notes',
     description: 'Save for later reference',
-    icon: '💾',
     contentTypes: ['text', 'math', 'code'],
     action: 'SAVE_NOTE'
   },
@@ -95,7 +84,6 @@ export const TOOL_DEFINITIONS = [
     id: 'define_word',
     name: 'Define',
     description: 'Get dictionary definition',
-    icon: '📖',
     contentTypes: ['text'],
     action: 'DEFINE_WORD'
   },
@@ -103,7 +91,6 @@ export const TOOL_DEFINITIONS = [
     id: 'visualize_chemical',
     name: '3D Structure',
     description: 'View molecular structure',
-    icon: '🧪',
     contentTypes: ['chemical'],
     action: 'VISUALIZE_CHEMICAL'
   },
@@ -111,7 +98,6 @@ export const TOOL_DEFINITIONS = [
     id: 'timeline_view',
     name: 'Timeline',
     description: 'View in historical context',
-    icon: '📅',
     contentTypes: ['historical'],
     action: 'TIMELINE_VIEW'
   },
@@ -119,7 +105,6 @@ export const TOOL_DEFINITIONS = [
     id: 'export_table',
     name: 'Export Data',
     description: 'Export as CSV/Excel',
-    icon: '📊',
     contentTypes: ['table'],
     action: 'EXPORT_TABLE'
   },
@@ -127,7 +112,6 @@ export const TOOL_DEFINITIONS = [
     id: 'visualize_data',
     name: 'Visualize Data',
     description: 'Create charts from data',
-    icon: '📈',
     contentTypes: ['table'],
     action: 'VISUALIZE_DATA'
   },
@@ -135,7 +119,6 @@ export const TOOL_DEFINITIONS = [
     id: 'fetch_citation',
     name: 'Get Paper',
     description: 'Fetch full reference',
-    icon: '📄',
     contentTypes: ['citation'],
     action: 'FETCH_CITATION'
   },
@@ -143,7 +126,6 @@ export const TOOL_DEFINITIONS = [
     id: 'check_link',
     name: 'Check Link',
     description: 'Preview and verify safety',
-    icon: '🔗',
     contentTypes: ['url'],
     action: 'CHECK_LINK'
   },
@@ -151,7 +133,6 @@ export const TOOL_DEFINITIONS = [
     id: 'pronounce',
     name: 'Pronounce',
     description: 'Hear pronunciation',
-    icon: '🔊',
     contentTypes: ['foreign', 'text'],
     action: 'PRONOUNCE'
   }
@@ -168,4 +149,3 @@ export function getToolsForContent(contentTypes) {
 export function getToolById(id) {
   return TOOL_DEFINITIONS.find(tool => tool.id === id);
 }
-

@@ -13,8 +13,8 @@
 
 /* Highlight selection effect (optional) */
 .proactive-ai-highlight {
-  background-color: rgba(102, 126, 234, 0.1) !important;
-  outline: 2px solid rgba(102, 126, 234, 0.3);
+  background-color: rgba(182, 131, 85, 0.12) !important;
+  outline: 2px solid rgba(182, 131, 85, 0.32);
   outline-offset: 2px;
   transition: all 0.2s ease;
 }
@@ -22,31 +22,34 @@
 /* Floating action button */
 #proactive-ai-fab {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 56px;
-  height: 56px;
+  bottom: 24px;
+  right: 24px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(68, 54, 42, 0.12);
+  box-shadow: 0 24px 48px rgba(68, 54, 42, 0.22);
   cursor: pointer;
   z-index: 2147483645;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  transition: all 0.3s ease;
-  border: none;
-  color: white;
+  font-size: 26px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  color: #b68355;
+  backdrop-filter: blur(18px);
 }
 
 #proactive-ai-fab:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 32px 54px rgba(182, 131, 85, 0.28);
+  border-color: rgba(182, 131, 85, 0.38);
 }
 
 #proactive-ai-fab:active {
-  transform: scale(0.95);
+  transform: translateY(0);
+  box-shadow: 0 20px 40px rgba(182, 131, 85, 0.22);
 }
 
 /* OCR Image Indicator Badge */
@@ -56,62 +59,69 @@
   left: 0 !important;
   width: 32px !important;
   height: 32px !important;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
   border-radius: 0 0 12px 0 !important;
+  border: 1px solid rgba(68, 54, 42, 0.14) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   font-size: 16px !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 18px 28px rgba(68, 54, 42, 0.22) !important;
   z-index: 2147483644 !important;
   pointer-events: none !important;
-  animation: proactive-ai-pulse 2s infinite !important;
-  cursor: pointer !important;
+  animation: proactive-ai-pulse 2.2s infinite !important;
+  color: #b68355 !important;
 }
 
 .proactive-ai-ocr-badge::before {
-  content: '📷' !important;
+  content: 'OCR' !important;
   display: block !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
 }
 
 /* Image with OCR capability - subtle highlight */
 .proactive-ai-ocr-detected {
-  outline: 2px solid rgba(102, 126, 234, 0.4) !important;
+  outline: 2px solid rgba(182, 131, 85, 0.35) !important;
   outline-offset: 2px !important;
   transition: all 0.3s ease !important;
   position: relative !important;
 }
 
 .proactive-ai-ocr-detected:hover {
-  outline-color: rgba(102, 126, 234, 0.7) !important;
+  outline-color: rgba(182, 131, 85, 0.5) !important;
 }
 
 /* Processing state */
 .proactive-ai-ocr-processing {
-  outline: 2px solid rgba(255, 193, 7, 0.6) !important;
+  outline: 2px solid rgba(255, 149, 0, 0.6) !important;
 }
 
 .proactive-ai-ocr-processing .proactive-ai-ocr-badge {
-  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%) !important;
+  color: #ff9500 !important;
+  border-color: rgba(255, 149, 0, 0.3) !important;
   animation: proactive-ai-spin 1s linear infinite !important;
 }
 
 .proactive-ai-ocr-processing .proactive-ai-ocr-badge::before {
-  content: '⚡' !important;
+  content: 'Wait' !important;
 }
 
 /* Success state */
 .proactive-ai-ocr-success {
-  outline: 2px solid rgba(76, 175, 80, 0.6) !important;
+  outline: 2px solid rgba(52, 199, 89, 0.55) !important;
 }
 
 .proactive-ai-ocr-success .proactive-ai-ocr-badge {
-  background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%) !important;
-  animation: proactive-ai-bounce 0.5s ease !important;
+  color: #34c759 !important;
+  border-color: rgba(52, 199, 89, 0.3) !important;
+  animation: proactive-ai-bounce 0.6s ease !important;
 }
 
 .proactive-ai-ocr-success .proactive-ai-ocr-badge::before {
-  content: '✓' !important;
+  content: 'Done' !important;
+  letter-spacing: 0 !important;
 }
 
 /* Animations */
@@ -143,4 +153,3 @@
     transform: scale(1.15);
   }
 }
-

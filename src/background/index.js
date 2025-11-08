@@ -49,9 +49,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const windowId = sender?.tab?.windowId ?? (await chrome.windows.getLastFocused()).id;
         try {
           await chrome.sidePanel.open({ windowId });
-          console.log('✅ Side panel opened successfully');
+          console.log('Side panel opened successfully');
         } catch (error) {
-          console.error('❌ Error opening side panel:', error);
+          console.error('Error opening side panel:', error);
           sendResponse({ success: false, error: error.message });
           return;
         }
@@ -68,7 +68,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         sendResponse({ success: true });
       } catch (error) {
-        console.error('❌ Unexpected error while opening side panel:', error);
+        console.error('Unexpected error while opening side panel:', error);
         sendResponse({ success: false, error: error.message });
       }
     })();
@@ -240,7 +240,7 @@ async function handleOCRImage(text) {
   // This handler just provides additional context or analysis
   return {
     type: 'text',
-    content: `📷 **Text extracted from image:**\n\n${text}\n\n✨ You can now use other tools on this text!`,
+    content: `Extracted text from image:\n\n${text}\n\nYou can now use other tools on this text.`,
     extractedText: text
   };
 }
@@ -292,7 +292,7 @@ Rules:
 
     return {
       type: 'graph',
-      instruction: '📊 Equation graphed! View it here or open the side panel for a larger chart.',
+      instruction: 'Equation graphed. View it here or open the side panel for a larger chart.',
       originalEquation: equation,
       equation: graphPayload.equations.join('; '),
       graph: {
@@ -315,7 +315,7 @@ Rules:
 
       return {
         type: 'graph',
-        instruction: '📊 Showing fallback graph. Review the plot in the side panel.',
+        instruction: 'Showing fallback graph. Review the plot in the side panel.',
         originalEquation: equation,
         equation: graphPayload.equations.join('; '),
         graph: {
@@ -451,7 +451,7 @@ async function persistGraphPayload({ traces, layout, equations, originalEquation
     }
   });
 
-  console.log('✅ Graph data saved for side panel');
+      console.log('Graph data saved for side panel');
 }
 
 function notifySidePanel(graphPayload, originalEquation) {
@@ -862,7 +862,7 @@ async function checkLink(url) {
     
     return {
       type: 'text',
-      content: `Domain: ${domain}\n\n${response.output_text}\n\n⚠️ Always be cautious when clicking unknown links!`
+      content: `Domain: ${domain}\n\n${response.output_text}\n\nStay cautious when clicking unknown links.`
     };
   } catch (error) {
     console.error('Link check error:', error);
@@ -875,9 +875,9 @@ chrome.action.onClicked.addListener(async (tab) => {
   console.log('Extension icon clicked, opening side panel...');
   try {
     await chrome.sidePanel.open({ windowId: tab.windowId });
-    console.log('✅ Side panel opened from extension icon');
+    console.log('Side panel opened from extension icon');
   } catch (error) {
-    console.error('❌ Error opening side panel from icon:', error);
+    console.error('Error opening side panel from icon:', error);
   }
 });
 
@@ -897,4 +897,3 @@ chrome.runtime.onInstalled.addListener(() => {
     // Ignore if not supported
   }
 });
-

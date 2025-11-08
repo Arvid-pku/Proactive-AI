@@ -62,7 +62,7 @@ function Popup() {
   return (
     <div className="popup-container">
       <div className="popup-header">
-        <h1>✨ Proactive AI Assistant</h1>
+        <h1>Proactive AI Assistant</h1>
         <p className="popup-subtitle">Context-aware learning companion</p>
       </div>
 
@@ -71,13 +71,13 @@ function Popup() {
           className={`popup-tab ${activeTab === 'notes' ? 'active' : ''}`}
           onClick={() => setActiveTab('notes')}
         >
-          📝 Notes ({notes.length})
+          Notes ({notes.length})
         </button>
         <button
           className={`popup-tab ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
-          ⚙️ Settings
+          Settings
         </button>
       </div>
 
@@ -159,20 +159,20 @@ function Popup() {
           <div className="popup-setting">
             <label className="popup-label">Features</label>
             <ul className="popup-features">
-              <li>📊 Graph mathematical equations</li>
-              <li>💻 Explain and debug code</li>
-              <li>🌍 Translate text</li>
-              <li>📝 Summarize content</li>
-              <li>🧪 Visualize chemistry</li>
-              <li>📅 Historical timelines</li>
-              <li>And much more!</li>
+              <li>Graph mathematical equations</li>
+              <li>Explain and debug code</li>
+              <li>Translate text</li>
+              <li>Summarize content</li>
+              <li>Visualize chemistry</li>
+              <li>Explore historical timelines</li>
+              <li>And much more</li>
             </ul>
           </div>
         </div>
       )}
 
       <div className="popup-footer">
-        <p>Made with ❤️ for learners everywhere</p>
+        <p>Made for curious learners everywhere</p>
         <p className="popup-version">v1.0.0</p>
       </div>
     </div>
@@ -183,4 +183,3 @@ const root = document.getElementById('root');
 if (root) {
   ReactDOM.createRoot(root).render(<Popup />);
 }
-

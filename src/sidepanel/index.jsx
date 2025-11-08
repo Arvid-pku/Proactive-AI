@@ -24,7 +24,7 @@ function SidePanel() {
     // Check for pending graph when panel opens
     chrome.storage.local.get('pendingGraph', ({ pendingGraph }) => {
       if (pendingGraph && pendingGraph.traces) {
-        console.log('✅ Found pending graph data');
+        console.log('Found pending graph data');
         setActiveTab('graph');
         setCurrentGraph(pendingGraph);
         
@@ -67,9 +67,9 @@ function SidePanel() {
         }
       );
 
-      console.log('✅ Plotly graph rendered');
+      console.log('Plotly graph rendered');
     } catch (error) {
-      console.error('❌ Error rendering Plotly graph:', error);
+      console.error('Error rendering Plotly graph:', error);
     }
 
     return () => {
@@ -112,7 +112,7 @@ function SidePanel() {
   return (
     <div className="sidepanel-container">
       <div className="sidepanel-header">
-        <h1>✨ Proactive AI Assistant</h1>
+        <h1>Proactive AI Assistant</h1>
         <p>Context-aware learning companion</p>
       </div>
 
@@ -121,19 +121,19 @@ function SidePanel() {
           className={`sidepanel-tab ${activeTab === 'graph' ? 'active' : ''}`}
           onClick={() => setActiveTab('graph')}
         >
-          📊 Graph
+          Graph
         </button>
         <button
           className={`sidepanel-tab ${activeTab === 'notes' ? 'active' : ''}`}
           onClick={() => setActiveTab('notes')}
         >
-          📝 Notes ({notes.length})
+          Notes ({notes.length})
         </button>
         <button
           className={`sidepanel-tab ${activeTab === 'settings' ? 'active' : ''}`}
           onClick={() => setActiveTab('settings')}
         >
-          ⚙️ Settings
+          Settings
         </button>
       </div>
 
@@ -144,7 +144,7 @@ function SidePanel() {
             {currentGraph ? (
               <>
                 <div className="equation-display">
-                  📐 {currentGraph.originalEquation || currentGraph.equations?.join('; ')}
+                  {currentGraph.originalEquation || currentGraph.equations?.join('; ')}
                 </div>
                 {currentGraph.equations?.length > 0 && (
                   <div className="equation-display" style={{ fontSize: '13px', opacity: 0.75 }}>
@@ -159,11 +159,10 @@ function SidePanel() {
               </>
             ) : (
               <div className="placeholder">
-                <div className="placeholder-icon">📊</div>
-                <h2>Ready to Graph!</h2>
+                <h2>Ready to Graph</h2>
                 <p>Select a math equation on any webpage, then click "Graph Equation" to visualize it here.</p>
                 <p style={{ marginTop: '12px', fontSize: '13px', color: '#999' }}>
-                  Or click the ✨ icon in the bottom-right corner of any page!
+                  Use the assistant button in the lower right corner of any page to open this panel quickly.
                 </p>
               </div>
             )}
@@ -234,7 +233,7 @@ function SidePanel() {
             <div className="setting-block">
               <label className="setting-label">Quick Access</label>
               <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
-                Look for the <strong>✨ icon</strong> in the bottom-right corner of webpages to quickly open this panel!
+                Use the assistant button in the bottom-right corner of webpages to open this panel instantly.
               </p>
             </div>
           </div>
@@ -248,4 +247,3 @@ const root = document.getElementById('root');
 if (root) {
   ReactDOM.createRoot(root).render(<SidePanel />);
 }
-
