@@ -99,9 +99,10 @@ async function handleToolSuggestions({ content, context, contentTypes }) {
     const client = await getOpenAIClient();
     
     const systemPrompt = `You are a helpful assistant that determines which tools would be most useful for selected content.
-Available content types: math, code, text, foreign, chemical, historical, table, citation, url
+Available content types: math, code, text, foreign, chemical, historical, table, citation, url, image
 
 Available tools:
+- ocr_image: Extract text from images using OCR (for image)
 - graph_equation: Graph mathematical equations (for math)
 - explain_math: Explain mathematical concepts (for math)
 - solve_equation: Solve mathematical equations (for math)
@@ -187,6 +188,7 @@ async function handleToolExecution({ toolId, content, context }) {
     const client = await getOpenAIClient();
     
     const toolHandlers = {
+      ocr_image: () => handleOCRImage(content),
       graph_equation: () => graphEquation(content),
       explain_math: () => explainWithAI(content, 'Explain this mathematical concept step by step'),
       solve_equation: () => explainWithAI(content, 'Solve this equation and show all steps'),
@@ -226,6 +228,17 @@ async function handleToolExecution({ toolId, content, context }) {
       error: error.message || 'An error occurred while executing the tool'
     };
   }
+}
+
+// Helper: Handle OCR image result
+async function handleOCRImage(text) {
+  // The OCR has already been performed in the content script
+  // This handler just provides additional context or analysis
+  return {
+    type: 'text',
+    content: `📷 **Text extracted from image:**\n\n${text}\n\n✨ You can now use other tools on this text!`,
+    extractedText: text
+  };
 }
 
 // Helper: Graph equation using Desmos (opens side panel)

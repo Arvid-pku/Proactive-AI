@@ -104,9 +104,37 @@ export function detectURL(text) {
   return /https?:\/\/[^\s]+/.test(text);
 }
 
+// Detect images
+export function detectImage(element) {
+  if (!element || !element.tagName) return false;
+  
+  // Direct img tag
+  if (element.tagName === 'IMG') return true;
+  
+  // Background image
+  try {
+    const style = window.getComputedStyle(element);
+    const bgImage = style.backgroundImage;
+    if (bgImage && bgImage !== 'none') return true;
+  } catch (e) {
+    // Ignore styling errors
+  }
+  
+  // Canvas or SVG
+  if (element.tagName === 'CANVAS' || element.tagName === 'SVG') return true;
+  
+  return false;
+}
+
 // Determine content type priority
 export function analyzeContent(text, element) {
   const types = [];
+  
+  // Check for image first
+  if (detectImage(element)) {
+    types.push('image');
+    return types; // For images, return early
+  }
   
   if (detectMath(text)) types.push('math');
   if (detectCode(text)) types.push('code');

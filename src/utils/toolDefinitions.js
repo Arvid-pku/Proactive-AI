@@ -4,6 +4,14 @@
 
 export const TOOL_DEFINITIONS = [
   {
+    id: 'ocr_image',
+    name: 'Extract Text (OCR)',
+    description: 'Extract text from image',
+    icon: '📷',
+    contentTypes: ['image'],
+    action: 'OCR_IMAGE'
+  },
+  {
     id: 'graph_equation',
     name: 'Graph Equation',
     description: 'Visualize mathematical equation using Desmos',

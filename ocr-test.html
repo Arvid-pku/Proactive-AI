@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Feature Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #2196F3;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 10px;
+        }
+        .image-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .test-image {
+            border: 3px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+            transition: all 0.3s;
+        }
+        .test-image:hover {
+            border-color: #2196F3;
+            box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+        }
+        .test-image img {
+            max-width: 300px;
+            display: block;
+        }
+        .test-image p {
+            margin: 10px 0 0 0;
+            font-size: 14px;
+            color: #666;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #2196F3;
+        }
+        .instructions strong {
+            color: #1976D2;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        .bg-image {
+            width: 300px;
+            height: 150px;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150"><text x="50%" y="50%" text-anchor="middle" font-size="20" fill="black">Background Text Test</text></svg>');
+            background-size: cover;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 OCR Feature Test Page</h1>
+    
+    <div class="instructions">
+        <strong>📝 Instructions:</strong>
+        <ol>
+            <li>Make sure the Proactive AI extension is installed and loaded</li>
+            <li><strong>Hover your mouse</strong> over any image below</li>
+            <li>You'll see a <strong>📷 badge</strong> appear in the top-left corner</li>
+            <li>Wait ~1 second for OCR to start</li>
+            <li>Badge changes to <strong>⚡ (processing)</strong> during OCR</li>
+            <li>Badge changes to <strong>✓ (success)</strong> when complete</li>
+            <li>Watch the console (F12) for OCR progress</li>
+            <li>See the tools appear based on extracted text!</li>
+        </ol>
+        <p><strong>💡 Visual Feedback:</strong></p>
+        <ul>
+            <li>🔵 <strong>Blue outline</strong> = OCR-capable image detected</li>
+            <li>📷 <strong>Camera badge</strong> = Ready for OCR</li>
+            <li>⚡ <strong>Lightning badge (spinning)</strong> = OCR in progress</li>
+            <li>✓ <strong>Checkmark badge (green)</strong> = Text extracted successfully</li>
+        </ul>
+    </div>
+
+    <!-- Math Equation Test -->
+    <div class="test-section">
+        <h2>🧮 Math Equation Test</h2>
+        <p>Hover over this equation - should trigger "Graph Equation" tool</p>
+        <div class="image-container">
+            <div class="test-image">
+                <canvas id="mathCanvas" width="300" height="100"></canvas>
+                <p>Canvas with equation: y = x² + 2x - 1</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Screenshot Test -->
+    <div class="test-section">
+        <h2>💻 Code Screenshot Test</h2>
+        <p>Hover over this code - should trigger "Explain Code" tool</p>
+        <div class="image-container">
+            <div class="test-image">
+                <canvas id="codeCanvas" width="400" height="150"></canvas>
+                <p>Canvas with code snippet</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Plain Text Test -->
+    <div class="test-section">
+        <h2>📝 Plain Text Test</h2>
+        <p>Hover over this text image - should trigger general text tools</p>
+        <div class="image-container">
+            <div class="test-image">
+                <canvas id="textCanvas" width="350" height="100"></canvas>
+                <p>Canvas with plain text</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Background Image Test -->
+    <div class="test-section">
+        <h2>🎨 Background Image Test</h2>
+        <p>Hover over this element with background image</p>
+        <div class="image-container">
+            <div class="test-image">
+                <div class="bg-image"></div>
+                <p>Background image with text</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- External Image Test -->
+    <div class="test-section">
+        <h2>🌐 External Image Test</h2>
+        <p>Hover over these SVG images with text</p>
+        <div class="image-container">
+            <div class="test-image">
+                <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="300" height="80" fill="#f0f0f0"/>
+                    <text x="150" y="40" text-anchor="middle" font-size="18" fill="#333">
+                        The quick brown fox jumps
+                    </text>
+                </svg>
+                <p>SVG with text</p>
+            </div>
+            <div class="test-image">
+                <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="300" height="80" fill="#e3f2fd"/>
+                    <text x="150" y="40" text-anchor="middle" font-size="16" fill="#1976D2">
+                        function hello() { return "world"; }
+                    </text>
+                </svg>
+                <p>SVG with code</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Draw equation on canvas
+        const mathCanvas = document.getElementById('mathCanvas');
+        const mathCtx = mathCanvas.getContext('2d');
+        mathCtx.fillStyle = '#fff';
+        mathCtx.fillRect(0, 0, mathCanvas.width, mathCanvas.height);
+        mathCtx.fillStyle = '#000';
+        mathCtx.font = 'bold 24px Arial';
+        mathCtx.textAlign = 'center';
+        mathCtx.fillText('y = x² + 2x - 1', mathCanvas.width / 2, mathCanvas.height / 2);
+
+        // Draw code on canvas
+        const codeCanvas = document.getElementById('codeCanvas');
+        const codeCtx = codeCanvas.getContext('2d');
+        codeCtx.fillStyle = '#f5f5f5';
+        codeCtx.fillRect(0, 0, codeCanvas.width, codeCanvas.height);
+        codeCtx.fillStyle = '#000';
+        codeCtx.font = '16px Monaco, monospace';
+        codeCtx.textAlign = 'left';
+        codeCtx.fillText('function add(a, b) {', 20, 30);
+        codeCtx.fillText('  return a + b;', 20, 60);
+        codeCtx.fillText('}', 20, 90);
+
+        // Draw text on canvas
+        const textCanvas = document.getElementById('textCanvas');
+        const textCtx = textCanvas.getContext('2d');
+        textCtx.fillStyle = '#fff';
+        textCtx.fillRect(0, 0, textCanvas.width, textCanvas.height);
+        textCtx.fillStyle = '#333';
+        textCtx.font = '18px Arial';
+        textCtx.textAlign = 'center';
+        textCtx.fillText('This is a simple text image', textCanvas.width / 2, 40);
+        textCtx.fillText('for testing OCR functionality', textCanvas.width / 2, 70);
+
+        console.log('✅ OCR Test page loaded');
+        console.log('📝 Hover over images to trigger OCR');
+    </script>
+</body>
+</html>

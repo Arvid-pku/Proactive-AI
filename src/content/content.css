@@ -49,3 +49,98 @@
   transform: scale(0.95);
 }
 
+/* OCR Image Indicator Badge */
+.proactive-ai-ocr-badge {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border-radius: 0 0 12px 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  z-index: 2147483644 !important;
+  pointer-events: none !important;
+  animation: proactive-ai-pulse 2s infinite !important;
+  cursor: pointer !important;
+}
+
+.proactive-ai-ocr-badge::before {
+  content: '📷' !important;
+  display: block !important;
+}
+
+/* Image with OCR capability - subtle highlight */
+.proactive-ai-ocr-detected {
+  outline: 2px solid rgba(102, 126, 234, 0.4) !important;
+  outline-offset: 2px !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+}
+
+.proactive-ai-ocr-detected:hover {
+  outline-color: rgba(102, 126, 234, 0.7) !important;
+}
+
+/* Processing state */
+.proactive-ai-ocr-processing {
+  outline: 2px solid rgba(255, 193, 7, 0.6) !important;
+}
+
+.proactive-ai-ocr-processing .proactive-ai-ocr-badge {
+  background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%) !important;
+  animation: proactive-ai-spin 1s linear infinite !important;
+}
+
+.proactive-ai-ocr-processing .proactive-ai-ocr-badge::before {
+  content: '⚡' !important;
+}
+
+/* Success state */
+.proactive-ai-ocr-success {
+  outline: 2px solid rgba(76, 175, 80, 0.6) !important;
+}
+
+.proactive-ai-ocr-success .proactive-ai-ocr-badge {
+  background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%) !important;
+  animation: proactive-ai-bounce 0.5s ease !important;
+}
+
+.proactive-ai-ocr-success .proactive-ai-ocr-badge::before {
+  content: '✓' !important;
+}
+
+/* Animations */
+@keyframes proactive-ai-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes proactive-ai-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes proactive-ai-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
