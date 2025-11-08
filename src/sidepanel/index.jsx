@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
+import Plotly from 'plotly.js-dist-min';
 import './sidepanel.css';
 
 function SidePanel() {
@@ -12,7 +13,7 @@ function SidePanel() {
   const [notes, setNotes] = useState([]);
   const [apiKey, setApiKey] = useState('');
   const [savedMessage, setSavedMessage] = useState(false);
-  const [currentEquation, setCurrentEquation] = useState(null);
+  const [currentGraph, setCurrentGraph] = useState(null);
   const graphRef = useRef(null);
 
   // Load initial data
@@ -22,13 +23,10 @@ function SidePanel() {
     
     // Check for pending graph when panel opens
     chrome.storage.local.get('pendingGraph', ({ pendingGraph }) => {
-      if (pendingGraph && pendingGraph.equation) {
-        console.log('✅ Found pending graph:', pendingGraph.equation);
+      if (pendingGraph && pendingGraph.traces) {
+        console.log('✅ Found pending graph data');
         setActiveTab('graph');
-        setCurrentEquation({
-          equation: pendingGraph.equation,
-          original: pendingGraph.originalEquation
-        });
+        setCurrentGraph(pendingGraph);
         
         // Clear the pending graph
         chrome.storage.local.remove('pendingGraph');
@@ -41,9 +39,12 @@ function SidePanel() {
       
       if (request.action === 'GRAPH_EQUATION') {
         setActiveTab('graph');
-        setCurrentEquation({
-          equation: request.equation,
-          original: request.originalEquation
+        setCurrentGraph({
+          traces: request.graphData?.traces || [],
+          layout: request.graphData?.layout || {},
+          equations: request.graphData?.equations || [],
+          originalEquation: request.originalEquation,
+          timestamp: Date.now()
         });
         sendResponse({ success: true });
       }
@@ -52,41 +53,31 @@ function SidePanel() {
     });
   }, []);
 
-  // Update iframe when equation changes
   useEffect(() => {
-    if (currentEquation && graphRef.current) {
-      updateGraph(currentEquation.equation);
-    }
-  }, [currentEquation]);
-
-  // Update graph in iframe
-  const updateGraph = (equation) => {
-    if (!graphRef.current) return;
+    if (!graphRef.current || !currentGraph) return;
 
     try {
-      console.log('Updating graph for:', equation);
-      
-      // Build Desmos URL with equation - proper format
-      const equations = equation.split(';').map(eq => eq.trim()).filter(eq => eq);
-      
-      // Build URL with equations as hash parameters (this auto-graphs them!)
-      // Format: https://www.desmos.com/calculator/HASH_WITH_EQUATIONS
-      // Simple format that works: just add as query param
-      const params = equations.map((eq, i) => `expr${i}=${encodeURIComponent(eq)}`).join('&');
-      const desmosUrl = `https://www.desmos.com/calculator?${params}`;
-      
-      console.log('Loading Desmos iframe with URL:', desmosUrl);
-      console.log('Equations to graph:', equations);
-      
-      // Update iframe src
-      graphRef.current.src = desmosUrl;
-      
-      console.log('✅ Graph iframe updated with equation');
-      console.log('📊 Desmos should now display:', equations.join(', '));
+      Plotly.react(
+        graphRef.current,
+        currentGraph.traces || [],
+        currentGraph.layout || {},
+        {
+          displaylogo: false,
+          responsive: true
+        }
+      );
+
+      console.log('✅ Plotly graph rendered');
     } catch (error) {
-      console.error('❌ Error updating graph:', error);
+      console.error('❌ Error rendering Plotly graph:', error);
     }
-  };
+
+    return () => {
+      if (graphRef.current) {
+        Plotly.purge(graphRef.current);
+      }
+    };
+  }, [currentGraph]);
 
   const loadNotes = () => {
     chrome.storage.local.get('notes', ({ notes = [] }) => {
@@ -150,17 +141,20 @@ function SidePanel() {
         {/* Graph Tab */}
         {activeTab === 'graph' && (
           <div className="tab-panel">
-            {currentEquation ? (
+            {currentGraph ? (
               <>
                 <div className="equation-display">
-                  📐 {currentEquation.original || currentEquation.equation}
+                  📐 {currentGraph.originalEquation || currentGraph.equations?.join('; ')}
                 </div>
-                <iframe
+                {currentGraph.equations?.length > 0 && (
+                  <div className="equation-display" style={{ fontSize: '13px', opacity: 0.75 }}>
+                    Plotting: {currentGraph.equations.join('; ')}
+                  </div>
+                )}
+                <div
                   ref={graphRef}
                   className="graph-iframe"
-                  title="Desmos Graph"
-                  frameBorder="0"
-                  allow="fullscreen"
+                  title="Plotly Graph"
                 />
               </>
             ) : (

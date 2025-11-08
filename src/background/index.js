@@ -4,6 +4,10 @@
  */
 
 import OpenAI from 'openai';
+import { create, all } from 'mathjs';
+
+const math = create(all);
+math.config({ number: 'number', precision: 14 });
 
 // Initialize OpenAI client
 let openaiClient = null;
@@ -241,14 +245,15 @@ async function handleOCRImage(text) {
   };
 }
 
-// Helper: Graph equation using Desmos (opens side panel)
+// Helper: Graph equation using Plotly (opens side panel)
 async function graphEquation(equation) {
+  const fallbackEquation = equation.replace(/\\|{|}/g, '').trim();
+
   try {
     const client = await getOpenAIClient();
-    
-    console.log('Parsing equation for Desmos:', equation);
-    
-    // Use AI to convert equation to Desmos-compatible format
+
+    console.log('Parsing equation for Plotly:', equation);
+
     const response = await client.responses.create({
       model: 'gpt-5-mini',
       input: [
@@ -256,79 +261,305 @@ async function graphEquation(equation) {
           role: 'system',
           content: [{
             type: 'input_text',
-            text: `You are a math equation parser. Convert the given equation to Desmos calculator format.
+            text: `You convert mathematical input into clean, explicit functions of x that can be plotted with Plotly.
 Rules:
-- Use y= for functions (e.g., "y=x^2")
-- Use x^2 for powers (not x²)
-- Keep simple format
-- If multiple equations, separate with semicolons
-- Return ONLY the equation(s), no explanation
-Examples:
-Input: "f(x) = x² + 2x + 1" → Output: "y=x^2+2x+1"
-Input: "y = sin(x)" → Output: "y=sin(x)"
-Input: "x² + y² = 25" → Output: "x^2+y^2=25"`
+- Output a SINGLE line with equations separated by semicolons, e.g. "y=x^2; y=-x^2".
+- Each equation must be solved for y and may only reference x, numeric constants, and standard math functions (sin, cos, tan, asin, acos, atan, exp, log, ln, abs, sqrt, sinh, cosh, tanh).
+- Replace words, named functions, or parameters (lambda, penalty, ObjectiveFunction, etc.) with numeric constants.
+- Use ASCII characters only (use ^ for exponents) and avoid Unicode math symbols.
+- Do not include narration or labels—return only the cleaned equations.`
           }]
         },
         {
           role: 'user',
-          content: [{ type: 'input_text', text: `Convert to Desmos format: ${equation}` }]
+          content: [{ type: 'input_text', text: `Convert for Plotly: ${equation}` }]
         }
       ]
     });
-    
-    const desmosEquation = response.output_text.trim();
-    console.log('Desmos equation:', desmosEquation);
-    
-    // Store equation in chrome.storage so side panel can read it
-    await chrome.storage.local.set({
-      pendingGraph: {
-        equation: desmosEquation,
-        originalEquation: equation,
-        timestamp: Date.now()
-      }
-    });
-    
-    console.log('✅ Equation saved to storage for side panel');
-    
-    // Try to send to side panel if it's open (will fail if not, but that's OK)
-    setTimeout(() => {
-      chrome.runtime.sendMessage({
-        action: 'GRAPH_EQUATION',
-        equation: desmosEquation,
-        originalEquation: equation
-      }).catch(error => {
-        console.log('Side panel not open yet, equation stored for when it opens');
-      });
-    }, 100);
-    
-    return {
-      type: 'success',
-      message: '📊 Equation ready! Click the ✨ icon or extension icon to view the graph.',
-      equation: desmosEquation,
+
+    const normalizedEquations = response.output_text.trim();
+    console.log('Normalized equation(s):', normalizedEquations);
+
+    const sanitizedEquations = sanitizeEquationText(normalizedEquations);
+    const graphPayload = buildPlotlyPayload(sanitizedEquations);
+
+    await persistGraphPayload({
+      ...graphPayload,
       originalEquation: equation
+    });
+
+    notifySidePanel(graphPayload, equation);
+
+    return {
+      type: 'graph',
+      instruction: '📊 Equation graphed! View it here or open the side panel for a larger chart.',
+      originalEquation: equation,
+      equation: graphPayload.equations.join('; '),
+      graph: {
+        traces: graphPayload.traces,
+        layout: graphPayload.layout
+      }
     };
   } catch (error) {
     console.error('Equation parsing error:', error);
-    // Fallback: simple cleaning
-    const cleaned = equation.replace(/\\|{|}/g, '').trim();
-    const desmosEquation = cleaned.includes('=') ? cleaned : `y=${cleaned}`;
-    
-    // Store in storage
-    await chrome.storage.local.set({
-      pendingGraph: {
-        equation: desmosEquation,
+
+    try {
+  const fallbackText = sanitizeEquationText(fallbackEquation.includes('=') ? fallbackEquation : `y=${fallbackEquation}`);
+  const graphPayload = buildPlotlyPayload(fallbackText);
+      await persistGraphPayload({
+        ...graphPayload,
+        originalEquation: equation
+      });
+
+      notifySidePanel(graphPayload, equation);
+
+      return {
+        type: 'graph',
+        instruction: '📊 Showing fallback graph. Review the plot in the side panel.',
         originalEquation: equation,
-        timestamp: Date.now()
+        equation: graphPayload.equations.join('; '),
+        graph: {
+          traces: graphPayload.traces,
+          layout: graphPayload.layout
+        }
+      };
+    } catch (fallbackError) {
+      console.error('Fallback graph generation failed:', fallbackError);
+      throw new Error('Unable to generate a graph for the selected equation.');
+    }
+  }
+}
+
+function buildPlotlyPayload(equationText) {
+  const parts = equationText
+    .split(/[;\n]/)
+    .map(eq => eq.trim())
+    .filter(Boolean);
+
+  if (!parts.length) {
+    throw new Error('No plottable equations returned.');
+  }
+
+  const xValues = generateXValues();
+  const traces = [];
+
+  parts.forEach((raw, index) => {
+    const expression = extractExplicitExpression(raw);
+    if (!expression) {
+      console.warn('Skipping unsupported equation:', raw);
+      return;
+    }
+
+    try {
+      const compiled = math.compile(expression);
+      const parameterDefaults = getParameterDefaults(expression);
+      const scope = { ...parameterDefaults, x: 0 };
+      const yValues = xValues.map(x => {
+        try {
+          scope.x = x;
+          const value = compiled.evaluate(scope);
+          const numeric = extractNumericValue(value);
+          return Number.isFinite(numeric) ? Number(numeric) : null;
+        } catch {
+          return null;
+        }
+      });
+
+      if (yValues.every(v => v === null)) {
+        console.warn('All values undefined for equation:', raw);
+        return;
+      }
+
+      traces.push({
+        x: [...xValues],
+        y: yValues,
+        mode: 'lines',
+        name: raw,
+        hovertemplate: 'x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>'
+      });
+    } catch (compileError) {
+      console.warn('Failed to compile equation:', raw, compileError);
+    }
+  });
+
+  if (!traces.length) {
+    throw new Error('Unable to generate any plot traces from the equation.');
+  }
+
+  const layout = {
+    title: { text: 'Equation Graph', font: { size: 16 } },
+    margin: { t: 40, r: 20, b: 40, l: 50 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    xaxis: { title: 'x', zeroline: true, zerolinecolor: '#ccc' },
+    yaxis: { title: 'y', zeroline: true, zerolinecolor: '#ccc' },
+    showlegend: traces.length > 1
+  };
+
+  return {
+    traces,
+    layout,
+    equations: parts
+  };
+}
+
+function extractExplicitExpression(raw) {
+  if (!raw) return null;
+  let expression = raw.trim();
+
+  const explicitRegex = /^(y|f\s*\(\s*x\s*\))\s*=\s*/i;
+  if (explicitRegex.test(expression)) {
+    return expression.replace(explicitRegex, '').trim();
+  }
+
+  if (expression.includes('=')) {
+    const [left, right] = expression.split('=').map(part => part.trim());
+    if (/^(y|f\s*\(\s*x\s*\))$/i.test(left)) {
+      return right;
+    }
+    if (/^(y|f\s*\(\s*x\s*\))$/i.test(right)) {
+      return left;
+    }
+    return null;
+  }
+
+  return expression;
+}
+
+function generateXValues() {
+  const points = [];
+  const steps = 200;
+  const min = -10;
+  const max = 10;
+  const stepSize = (max - min) / steps;
+
+  for (let i = 0; i <= steps; i++) {
+    points.push(Number((min + stepSize * i).toFixed(4)));
+  }
+
+  return points;
+}
+
+async function persistGraphPayload({ traces, layout, equations, originalEquation }) {
+  await chrome.storage.local.set({
+    pendingGraph: {
+      traces,
+      layout,
+      equations,
+      originalEquation,
+      timestamp: Date.now()
+    }
+  });
+
+  console.log('✅ Graph data saved for side panel');
+}
+
+function notifySidePanel(graphPayload, originalEquation) {
+  setTimeout(() => {
+    chrome.runtime.sendMessage({
+      action: 'GRAPH_EQUATION',
+      graphData: {
+        traces: graphPayload.traces,
+        layout: graphPayload.layout,
+        equations: graphPayload.equations
+      },
+      originalEquation
+    }).catch(() => {
+      console.log('Side panel not open yet, graph stored for later');
+    });
+  }, 100);
+}
+
+function sanitizeEquationText(text) {
+  if (!text) {
+    return '';
+  }
+
+  let cleaned = String(text)
+    .replace(/\r?\n+/g, ';')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/λ/gi, '1')
+    .replace(/∑/g, '')
+    .replace(/Objective\s*Function\s*=*/gi, '')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/;+\s*;/g, ';');
+
+  cleaned = cleaned.replace(/\b([a-zA-Z][a-zA-Z0-9_]*)\s*\(\s*x\s*\)/g, (match, name) => {
+    const lower = name.toLowerCase();
+    return ALLOWED_FUNCTIONS.has(lower) ? `${lower}(x)` : 'x';
+  });
+
+  cleaned = cleaned
+    .replace(/\bpenalty\d*\b/gi, '1')
+    .replace(/\bmargin\d*\b/gi, '1')
+    .replace(/\blambda\b/gi, '1')
+    .replace(/\bobjective\b/gi, '')
+    .replace(/\bfunction\b/gi, '')
+    .replace(/1\s*\(\s*x\s*\)/g, 'x');
+
+  return cleaned
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .join('; ');
+}
+
+function extractNumericValue(value) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (value && typeof value.re === 'number') {
+    return value.re;
+  }
+  if (value && typeof value.toNumber === 'function') {
+    try {
+      return value.toNumber();
+    } catch {
+      return NaN;
+    }
+  }
+  return NaN;
+}
+
+const ALLOWED_FUNCTIONS = new Set([
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan',
+  'sinh', 'cosh', 'tanh', 'asinh', 'acosh', 'atanh',
+  'exp', 'log', 'ln', 'log10', 'log2', 'abs', 'sqrt',
+  'sec', 'csc', 'cot'
+]);
+
+const ALLOWED_SYMBOLS = new Set(['x', 'pi', 'e', 'tau', 'phi', 'PI', 'E', 'TAU', 'PHI', 'Infinity', 'NaN']);
+
+function getParameterDefaults(expression) {
+  try {
+    const node = math.parse(expression);
+    const params = new Set();
+    node.traverse(child => {
+      if (child?.isSymbolNode) {
+        params.add(child.name);
       }
     });
-    
-    console.log('✅ Equation saved (fallback)');
-    
-    return {
-      type: 'success',
-      message: '📊 Equation ready! Click the ✨ icon or extension icon to view the graph.',
-      equation: desmosEquation
-    };
+
+    const defaults = {};
+    params.forEach(name => {
+      if (ALLOWED_SYMBOLS.has(name) || ALLOWED_FUNCTIONS.has(name.toLowerCase())) {
+        return;
+      }
+      if (typeof math[name] === 'function') {
+        return;
+      }
+      if (Object.prototype.hasOwnProperty.call(math, name) && typeof math[name] === 'number') {
+        return;
+      }
+      defaults[name] = 1;
+    });
+
+    return defaults;
+  } catch (error) {
+    console.warn('Parameter extraction failed:', error);
+    return {};
   }
 }
 

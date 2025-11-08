@@ -12,7 +12,9 @@
     "function-plot": "^1.25.1",
     "katex": "^0.16.9",
     "marked": "^11.0.0",
+    "mathjs": "^15.1.0",
     "openai": "^4.104.0",
+    "plotly.js-dist-min": "^3.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tesseract.js": "^6.0.1"
