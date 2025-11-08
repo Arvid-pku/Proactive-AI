@@ -1,0 +1,14 @@
+.DS_Store
+node_modules/
+dist/
+build/
+*.log
+tmp/
+.env
+.vercel/
+coverage/
+*.local
+*.swp
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
