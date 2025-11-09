@@ -296,14 +296,10 @@ async function runImageOCR(element, triggerPosition = null) {
         // NOW mark badge as success - UI is shown
         updateImageBadgeState(element, 'success');
         
-        // CRITICAL: Keep isProcessing=true for a moment to prevent immediate hiding
-        // UI needs time to render and stabilize before we allow clicks to affect it
-        setTimeout(() => {
-          console.log('🔄 OCR: Clearing isProcessing flag after UI stabilized');
-          if (target) {
-            target.isProcessing = false;
-          }
-        }, 300);
+        // Clear isProcessing immediately - UI is ready
+        if (target) {
+          target.isProcessing = false;
+        }
         
         // Add a small delay to check if UI is still visible
         setTimeout(() => {
@@ -327,13 +323,9 @@ async function runImageOCR(element, triggerPosition = null) {
     // Don't auto-hide on error - user can manually dismiss
     // hideUI();
   } finally {
-    // Always clear isProcessing flag when OCR completes or fails
+    // Clear isProcessing flag immediately when OCR completes or fails
     if (pendingAnalysis && pendingAnalysis.isProcessing) {
-      setTimeout(() => {
-        if (pendingAnalysis) {
-          pendingAnalysis.isProcessing = false;
-        }
-      }, 500);
+      pendingAnalysis.isProcessing = false;
     }
   }
 }
@@ -866,6 +858,9 @@ function showUI({
   console.log('  tools:', tools);
   console.log('  uiReady:', uiReady);
   
+  // Clear suppressNextClickReset when showing UI so clicks work immediately
+  suppressNextClickReset = false;
+  
   // Ensure UI is injected before attempting to show
   if (!uiInjected) {
     console.log('Injecting UI...');
@@ -1023,7 +1018,7 @@ function injectUI() {
     frame.style.border = '0';
     frame.style.background = 'transparent';
     frame.style.zIndex = '2147483646';
-    frame.style.pointerEvents = 'auto'; // Always auto - but only blocks the small UI area!
+    frame.style.pointerEvents = 'none'; // Let clicks pass through iframe transparent areas
     frame.style.display = 'none'; // Start hidden
     container.appendChild(frame);
     uiFrame = frame;
