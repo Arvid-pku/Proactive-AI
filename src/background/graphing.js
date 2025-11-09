@@ -43,11 +43,55 @@ export async function graphEquation(equation) {
             content: [
               {
                 type: 'input_text',
-                text: `You convert mathematical input into explicit functions of x that can be plotted with Plotly.
-Rules:
-- Return between 1 and 4 equations solved for y using only x, numeric constants, or standard math functions (sin, cos, tan, asin, acos, atan, exp, log, ln, abs, sqrt, sinh, cosh, tanh).
-- Replace words, named functions, or parameters (lambda, penalty, ObjectiveFunction, etc.) with numeric constants.
-- Use ASCII characters only (use ^ for exponents) and avoid Unicode math symbols.`
+                text: `You convert mathematical text (often messy OCR) into explicit functions of x that can be plotted with Plotly.
+
+Output format:
+- Return 1–4 equations, each on its own line, in the form: y = <expression in x and numeric constants only>
+- Use ASCII only (^ for powers). Allowed functions: sin, cos, tan, asin, acos, atan, exp, log, ln, abs, sqrt, sinh, cosh, tanh.
+- Replace words/named symbols/parameters (lambda, penalty, ObjectiveFunction, a, b, c, θ, β, etc.) with numeric constants (choose small integers like 1–5 as needed).
+
+Normalization & repair rules:
+1. Whitespace & symbols
+   - Collapse repeated spaces; convert Unicode minus to -; convert × or · to *.
+   - Convert Unicode superscripts to ^ (e.g., x² → x^2).
+   - Normalize ln/log usage.
+2. Parentheses inference
+   - When ambiguous forms like "1+e −z 1" appear, assume conventional fraction 1/(1+e^-z).
+   - Add missing parentheses in exponents: e^-x+1 → e^(-x)+1.
+3. Greek & named functions
+   - σ(...), sigmoid(...), logistic(...) → 1/(1+exp(-(...))).
+4. Fractions
+   - Fix stacked or reversed OCR fractions: 1+e −z 1 → 1/(1+e^(-z)).
+5. Variable binding
+   - Replace any variable (z, t, u, etc.) with x.
+6. Constants
+   - Replace named constants/parameters with integers 1–5; keep e as base of natural exponent.
+7. Solve for y
+   - If the left side is f(x), σ(x), etc., rewrite as y = ...
+
+Canonical patterns:
+- Sigmoid/logistic: σ(x), sigmoid(x), 1/(1+e^{-x}), 1/(1+exp(-x))
+- Softplus: ln(1+e^x)
+- Logit: ln(p/(1-p))
+- Common OCR slips: 1+e −x 1 → 1/(1+e^(-x)); sqrt x → sqrt(x)
+
+Examples:
+Input: σ(z)= 1+e −z 1
+Output: y = 1/(1+exp(-x))
+
+Input: f(t) = ln(1 + e t )
+Output: y = ln(1+exp(x))
+
+Input: ObjectiveFunction(x) = logistic( 3x-2 )
+Output: y = 1/(1+exp(-(3*x-2)))
+
+Input: p = 2x + a; σ(p)
+Output: y = 1/(1+exp(-(2*x+2)))
+
+Input: cos θ + sin θ
+Output: y = cos(x) + sin(x)
+
+`
               }
             ]
           },
