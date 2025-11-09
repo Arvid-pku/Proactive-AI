@@ -11,6 +11,9 @@ let mousePosition = { x: 0, y: 0 };
 let selectedElement = null;
 let selectedText = '';
 let uiInjected = false;
+let uiReady = false;
+let uiFrame = null;
+const uiMessageQueue = [];
 let currentOCRBadge = null;
 let currentContentTypes = [];
 let currentMetadata = null;
@@ -57,6 +60,27 @@ document.addEventListener('keyup', handleSelection);
 
 document.addEventListener('click', handleDocumentClick, true);
 
+// Listen for UI readiness from injected page script
+window.addEventListener('message', (event) => {
+  try {
+    if (event.data && event.data.type === 'PROACTIVE_AI_UI_READY') {
+      uiReady = true;
+      // Flush any queued UI messages
+      while (uiMessageQueue.length) {
+        const msg = uiMessageQueue.shift();
+        try {
+          if (uiFrame && uiFrame.contentWindow) {
+            uiFrame.style.pointerEvents = 'auto';
+            uiFrame.contentWindow.postMessage(msg, '*');
+          } else {
+            window.postMessage(msg, '*');
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+});
+
 /**
  * Handle text selection
  */
@@ -97,7 +121,7 @@ function handleSelection() {
     
     const triggerPosition = computeUpperRightPosition(rect);
     
-    pendingAnalysis = {
+    const target = {
       type: 'text',
       text,
       element,
@@ -107,14 +131,16 @@ function handleSelection() {
       ocrConfidence: null,
       showRequested: false,
       loading: false,
-      tools: null
+      tools: null,
+      promise: null
     };
     
-    preparePendingAnalysis(pendingAnalysis);
-    
+    target.promise = preparePendingAnalysis(target);
+    pendingAnalysis = target;
+
     showAnalysisTrigger(triggerPosition, {
       label: '',
-      onActivate: runPendingAnalysis
+      onActivate: () => runPendingAnalysis(target)
     });
   } else {
     selectedText = '';
@@ -174,7 +200,7 @@ async function runImageOCR(element, triggerPosition = null) {
       updateImageBadgeState(element, 'success');
       
       const analysisPosition = anchorPosition;
-      pendingAnalysis = {
+      const target = {
         type: 'text',
         text: ocrResult.text,
         element,
@@ -184,10 +210,23 @@ async function runImageOCR(element, triggerPosition = null) {
         ocrConfidence: ocrResult.confidence,
         showRequested: true,
         loading: true,
-        tools: null
+        tools: null,
+        promise: null
       };
       
-      preparePendingAnalysis(pendingAnalysis);
+      target.promise = preparePendingAnalysis(target);
+      pendingAnalysis = target;
+      
+      target.promise.then(() => {
+        if (pendingAnalysis === target && target.showRequested) {
+          showPreparedAnalysis(target);
+        }
+      }).catch((error) => {
+        console.error('OCR follow-up analysis failed:', error);
+        if (pendingAnalysis === target && target.showRequested) {
+          showPreparedAnalysis(target);
+        }
+      });
     } else {
       console.warn('No text found in image');
       removeImageBadge();
@@ -372,28 +411,48 @@ function removeAnalysisTrigger() {
   }
 }
 
-function runPendingAnalysis() {
-  if (!pendingAnalysis) return;
+async function runPendingAnalysis(target = pendingAnalysis) {
+  if (!target) return;
   
-  const target = pendingAnalysis;
   removeAnalysisTrigger();
   
   if (target.type === 'image') {
-    runImageOCR(target.element, target.position);
+    await runImageOCR(target.element, target.position);
     return;
   }
   
   target.showRequested = true;
+  pendingAnalysis = target;
   
-  if (!target.metadata) {
-    preparePendingAnalysis(target);
+  if (!target.promise) {
+    target.promise = preparePendingAnalysis(target);
   }
   
   if (target.loading) {
     showLoadingState(target);
-  } else {
+    try {
+      await target.promise;
+    } catch (error) {
+      console.error('Analysis preparation failed:', error);
+    }
+    if (pendingAnalysis !== target) {
+      return;
+    }
     showPreparedAnalysis(target);
+    return;
   }
+  
+  try {
+    await target.promise;
+  } catch (error) {
+    console.error('Analysis preparation failed:', error);
+  }
+  
+  if (pendingAnalysis !== target) {
+    return;
+  }
+  
+  showPreparedAnalysis(target);
 }
 
 function handleDocumentClick(event) {
@@ -443,7 +502,10 @@ const FALLBACK_TOOLS = {
   text: ['summarize', 'explain_text'],
   foreign: ['translate', 'pronounce'],
   chemical: ['visualize_chemical'],
-  table: ['export_table', 'visualize_data']
+  table: ['export_table', 'visualize_data'],
+  citation: ['fetch_citation', 'summarize'],
+  url: ['check_link', 'summarize'],
+  image: ['ocr_image', 'summarize']
 };
 
 function computeFallbackTools(contentTypes = []) {
@@ -454,8 +516,13 @@ function computeFallbackTools(contentTypes = []) {
 }
 
 function showLoadingState(target) {
+  const loadingTools =
+    (Array.isArray(target.tools) && target.tools.length > 0)
+      ? target.tools
+      : computeFallbackTools(target.contentTypes || []);
+      
   showUI({
-    tools: target.tools || [],
+    tools: loadingTools,
     content: target.text,
     position: target.position,
     contentTypes: target.contentTypes || [],
@@ -468,8 +535,13 @@ function showLoadingState(target) {
 }
 
 function showPreparedAnalysis(target) {
+  const preparedTools =
+    (Array.isArray(target.tools) && target.tools.length > 0)
+      ? target.tools
+      : computeFallbackTools(target.contentTypes || []);
+  
   showUI({
-    tools: target.tools || [],
+    tools: preparedTools,
     content: target.text,
     position: target.position,
     contentTypes: target.contentTypes || [],
@@ -503,10 +575,6 @@ async function preparePendingAnalysis(target) {
   target.loading = true;
   const requestId = Date.now();
   target.requestId = requestId;
-  
-  if (target.showRequested) {
-    showLoadingState(target);
-  }
   
   const requestPayload = {
     content: target.text.slice(0, 500),
@@ -572,10 +640,8 @@ async function preparePendingAnalysis(target) {
   if (!target.tools || target.tools.length === 0) {
     target.tools = computeFallbackTools(contentTypes);
   }
-  
-  if (target.showRequested) {
-    showPreparedAnalysis(target);
-  }
+
+  return target;
 }
 
 /**
@@ -592,15 +658,19 @@ function showUI({
   ocrConfidence = null,
   metadata = null
 }) {
+  // Ensure UI is injected before attempting to show
+  if (!uiInjected) {
+    injectUI();
+  }
+
   if (Array.isArray(contentTypes)) {
     currentContentTypes = contentTypes;
   }
   if (metadata) {
     currentMetadata = metadata;
   }
-  
-  // Send message to injected UI
-  window.postMessage({
+
+  const message = {
     type: 'PROACTIVE_AI_SHOW',
     payload: {
       tools,
@@ -614,21 +684,49 @@ function showUI({
       ocrConfidence,
       metadata: metadata || currentMetadata
     }
-  }, '*');
+  };
+
+  // If UI hasn't finished initializing yet, queue the message
+  if (!uiReady) {
+    uiMessageQueue.push(message);
+  }
+  // Also attempt to post immediately in case UI is already ready
+  try {
+    const containerEl = document.getElementById('proactive-ai-root');
+    if (containerEl) {
+      containerEl.style.pointerEvents = 'auto';
+    }
+    if (uiFrame && uiFrame.contentWindow) {
+      // Enable interactions while UI is visible
+      uiFrame.style.pointerEvents = 'auto';
+      uiFrame.contentWindow.postMessage(message, '*');
+    } else {
+      window.postMessage(message, '*');
+    }
+  } catch (_) {}
   
   // Inject UI if not already injected
-  if (!uiInjected) {
-    injectUI();
-  }
+  // (already ensured above)
 }
 
 /**
  * Hide UI
  */
 function hideUI() {
-  window.postMessage({
-    type: 'PROACTIVE_AI_HIDE'
-  }, '*');
+  const msg = { type: 'PROACTIVE_AI_HIDE' };
+  try {
+    if (uiFrame && uiFrame.contentWindow) {
+      uiFrame.contentWindow.postMessage(msg, '*');
+      // Disable interactions when hidden so page remains usable
+      uiFrame.style.pointerEvents = 'none';
+    } else {
+      window.postMessage(msg, '*');
+    }
+    const containerEl = document.getElementById('proactive-ai-root');
+    if (containerEl) {
+      containerEl.style.pointerEvents = 'none';
+    }
+  } catch (_) {}
   removeAnalysisTrigger();
 }
 
@@ -689,10 +787,29 @@ function injectUI() {
   container.id = 'proactive-ai-root';
   document.body.appendChild(container);
   
-  // Inject UI script
-  const script = document.createElement('script');
-  script.src = chrome.runtime.getURL('ui.js');
-  document.head.appendChild(script);
+  // Prefer iframe-based injection to avoid CSP issues
+  try {
+    const frame = document.createElement('iframe');
+    frame.id = 'proactive-ai-frame';
+    frame.src = chrome.runtime.getURL('ui.html');
+    frame.style.position = 'fixed';
+    frame.style.left = '0';
+    frame.style.top = '0';
+    frame.style.width = '100%';
+    frame.style.height = '100%';
+    frame.style.border = '0';
+    frame.style.background = 'transparent';
+    frame.style.zIndex = '2147483646';
+    // Start non-interactive; enable on show
+    frame.style.pointerEvents = 'none';
+    container.appendChild(frame);
+    uiFrame = frame;
+  } catch (e) {
+    // Fallback to direct script injection (may be blocked by CSP)
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('ui.js');
+    document.head.appendChild(script);
+  }
   
   // Create floating action button (FAB)
   const fab = document.createElement('button');
@@ -770,10 +887,14 @@ window.addEventListener('message', async (event) => {
         });
         
         // Send result back to UI
-        window.postMessage({
-          type: 'PROACTIVE_AI_TOOL_RESULT',
-          payload: response
-        }, '*');
+        try {
+          const msg = { type: 'PROACTIVE_AI_TOOL_RESULT', payload: response };
+          if (uiFrame && uiFrame.contentWindow) {
+            uiFrame.contentWindow.postMessage(msg, '*');
+          } else {
+            window.postMessage(msg, '*');
+          }
+        } catch (_) {}
 
         return;
       }
@@ -795,10 +916,14 @@ window.addEventListener('message', async (event) => {
       });
       
       // Send result back to UI
-      window.postMessage({
-        type: 'PROACTIVE_AI_TOOL_RESULT',
-        payload: response
-      }, '*');
+      try {
+        const msg = { type: 'PROACTIVE_AI_TOOL_RESULT', payload: response };
+        if (uiFrame && uiFrame.contentWindow) {
+          uiFrame.contentWindow.postMessage(msg, '*');
+        } else {
+          window.postMessage(msg, '*');
+        }
+      } catch (_) {}
       
       // Handle specific result types
       if (response && response.success && response.result) {

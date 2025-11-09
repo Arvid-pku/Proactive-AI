@@ -3,8 +3,12 @@
 #proactive-ai-root {
   all: initial;
   position: fixed;
+  inset: 0; /* cover viewport */
+  width: 100vw;
+  height: 100vh;
   z-index: 2147483646;
-  pointer-events: none;
+  pointer-events: none; /* enabled dynamically when showing UI */
+  display: block;
 }
 
 #proactive-ai-root * {

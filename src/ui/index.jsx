@@ -66,6 +66,16 @@ function ProactiveAI() {
     };
 
     window.addEventListener('message', handleMessage);
+    // Notify content script that UI is ready to receive messages
+    try {
+      const readyMsg = { type: 'PROACTIVE_AI_UI_READY' };
+      window.postMessage(readyMsg, '*');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(readyMsg, '*');
+      }
+    } catch (e) {
+      // ignore
+    }
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
@@ -84,7 +94,7 @@ function ProactiveAI() {
   // Handle tool click
   const handleToolClick = (toolId) => {
     setLoading(true);
-    window.postMessage({
+    const execMsg = {
       type: 'PROACTIVE_AI_EXECUTE_TOOL',
       payload: {
         toolId,
@@ -92,7 +102,15 @@ function ProactiveAI() {
         metadata,
         contentTypes
       }
-    }, '*');
+    };
+    try {
+      window.postMessage(execMsg, '*');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(execMsg, '*');
+      }
+    } catch (e) {
+      // ignore
+    }
   };
 
   // Close UI
@@ -345,7 +363,14 @@ function PlotlyGraph({ graph }) {
 }
 
 // Initialize React app
-const root = document.getElementById('proactive-ai-root');
-if (root) {
-  ReactDOM.createRoot(root).render(<ProactiveAI />);
+let mountNode =
+  document.getElementById('proactive-ai-root') ||
+  document.getElementById('root');
+
+if (!mountNode) {
+  mountNode = document.createElement('div');
+  mountNode.id = 'proactive-ai-root';
+  document.body.appendChild(mountNode);
 }
+
+ReactDOM.createRoot(mountNode).render(<ProactiveAI />);

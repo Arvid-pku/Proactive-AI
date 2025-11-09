@@ -42,22 +42,24 @@ export async function graphEquation(equation) {
       async () => {
         const response = await client.responses.create({
           model: 'gpt-5-mini',
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
-              name: 'plotly_equations',
-              schema: {
-                type: 'object',
-                properties: {
-                  equations: {
-                    type: 'array',
-                    items: { type: 'string' },
-                    minItems: 1,
-                    maxItems: 4
-                  }
-                },
-                required: ['equations'],
-                additionalProperties: false
+          text: {
+            format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'plotly_equations',
+                schema: {
+                  type: 'object',
+                  properties: {
+                    equations: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      minItems: 1,
+                      maxItems: 4
+                    }
+                  },
+                  required: ['equations'],
+                  additionalProperties: false
+                }
               }
             }
           },

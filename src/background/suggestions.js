@@ -27,12 +27,13 @@ export async function getToolSuggestions(request) {
     const client = await getOpenAIClient();
 
     const toolIds = await withLatencyMeter('tool-suggestions', async () => {
-      const response = await client.responses.create({
+      const response = await client.responses.parse({
         model: 'gpt-5-mini',
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
+        text: {
+          format: {
+            type: 'json_schema',
             name: 'tool_suggestion',
+            strict: true,
             schema: {
               type: 'object',
               properties: {
@@ -52,26 +53,21 @@ export async function getToolSuggestions(request) {
           {
             role: 'system',
             content: [
-              {
-                type: 'input_text',
-                text: buildSystemPrompt()
-              }
+              { type: 'input_text', text: buildSystemPrompt() }
             ]
           },
           {
             role: 'user',
             content: [
-              {
-                type: 'input_text',
-                text: buildUserPrompt({ content, context, contentTypes, metadata })
-              }
+              { type: 'input_text', text: buildUserPrompt({ content, context, contentTypes, metadata }) }
             ]
           }
         ]
       });
 
-      const parsed = safeParseJSON(response.output_text);
-      return Array.isArray(parsed.tools) ? parsed.tools : [];
+      // Prefer SDK-parsed output if available, fall back to raw text
+      const parsed = response.output_parsed ?? safeParseJSON(response.output_text);
+      return Array.isArray(parsed?.tools) ? parsed.tools : [];
     });
 
     const trimmedTools = toolIds.slice(0, 4);
