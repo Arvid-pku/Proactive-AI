@@ -18,6 +18,38 @@ export function detectMath(text) {
   return mathPatterns.some(pattern => pattern.test(text));
 }
 
+// Detect if math is plottable (contains variables and equations)
+export function detectPlottableMath(text) {
+  const plottablePatterns = [
+    /y\s*=\s*[^=]/i,  // y = something
+    /f\(x\)\s*=\s*/i,  // f(x) = something
+    /g\(x\)\s*=\s*/i,  // g(x) = something
+    /h\(x\)\s*=\s*/i,  // h(x) = something
+    /\b(sin|cos|tan|sec|csc|cot|sinh|cosh|tanh)\s*\(/i,  // Trig functions
+    /\b(log|ln|exp|sqrt|abs|floor|ceil)\s*\(/i,  // Other math functions
+    /x[\^²³⁴⁵⁶⁷⁸⁹]/i,  // Powers of x (including unicode)
+    /x\s*\*\*\s*\d/i,  // x**2 notation
+    /\d*x[\^²³⁴]?[\s]*[+\-*/][\s]*\d/i,  // Polynomial-like: 2x^2 + 3
+    /\d*x[\s]*[+\-][\s]*\d*x/i,  // Linear combinations: 3x + 2x
+    /\d*x²/i,  // Unicode superscript
+    /x\s*\/\s*\d/i,  // x/2 or similar fractions
+  ];
+  
+  // Relaxed variable detection - accept x, y, t, theta, or any single letter variable
+  const hasVariable = /\b[a-z]\b/i.test(text);
+  const looksLikeEquation = /[=]/.test(text);
+  const hasPlottablePattern = plottablePatterns.some(pattern => pattern.test(text));
+  
+  // More lenient: if has any math function OR variable with equation OR plottable pattern
+  const hasMathFunction = /\b(sin|cos|tan|log|ln|exp|sqrt)\s*\(/i.test(text);
+  const hasPolynomial = /\d*[a-z][\^²³⁴\*]{0,3}\d*/i.test(text);
+  
+  return hasPlottablePattern || 
+         (hasVariable && looksLikeEquation) || 
+         (hasMathFunction && hasVariable) ||
+         (hasPolynomial && hasVariable);
+}
+
 // Detect code snippets
 export function detectCode(text) {
   const codePatterns = [
@@ -151,7 +183,12 @@ export function analyzeContent(text, element) {
   
   if (detectMath(text)) {
     types.push('math');
-    diagnostics.push('Mathematical notation detected (operators, functions, or LaTeX).');
+    const isPlottable = detectPlottableMath(text);
+    if (isPlottable) {
+      diagnostics.push('Mathematical notation detected with plottable equation (contains variables and equation form).');
+    } else {
+      diagnostics.push('Mathematical notation detected (operators, functions, or LaTeX).');
+    }
   }
   if (detectCode(text)) {
     types.push('code');
