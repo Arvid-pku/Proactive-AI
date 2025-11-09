@@ -120,9 +120,9 @@ Always ground decisions in the actual selection text first, then use signals for
 
 Tool catalog (ID → purpose; typical inputs; avoid if…):
 - ocr_image → Extract text from images; input is an image; avoid for plain text selections.
-- graph_equation → Plot explicit functions/expressions (e.g., y=f(x)); avoid for prose math or pure arithmetic.
-- explain_math → Explain math ideas/derivations; avoid when the user likely wants a numeric solution.
-- solve_equation → Solve algebraic equations; avoid when no equation is present.
+- graph_equation → Plot explicit functions/expressions (e.g., y=2x+1, y=x^2, y=sin(x)) or functions/equations that becomes plottable once concrete values are assigned to some of its constants.; STRONGLY prefer when selection contains plottable equations; Also plot equations whose right-hand side can be plotted; avoid for pure text, prose math or pure arithmetic.
+- explain_math → Explain math ideas/derivations; avoid when the user likely wants a numeric solution or graph.
+- solve_equation → Solve algebraic equations for unknowns; avoid when no equation is present or when graphing is more appropriate.
 - explain_code → Understand code behavior, I/O, control flow, complexity; avoid if the text is non‑code.
 - debug_code → Likely bugs or error symptoms in code; avoid if no defect is implied.
 - improve_code → Refactor/optimize/clean up code; avoid if code is trivial or intent unknown.
@@ -138,6 +138,12 @@ Tool catalog (ID → purpose; typical inputs; avoid if…):
 - fetch_citation → Citations/DOIs/arXiv references; avoid for non‑reference text.
 - check_link → URL risk/preview; avoid if no URL present.
 - save_note → General capture when nothing else clearly fits.
+
+Priority guideline for math content:
+- If selection contains y=f(x) or similar plottable expression → PRIORITIZE graph_equation FIRST
+- If selection asks to solve for a variable → use solve_equation
+- If selection explains a concept or derivation → use explain_math
+- For equations with variables (x, y, etc.) → prefer graph_equation over solve_equation unless solving is explicitly requested
 
 Return up to 4 tool IDs, ordered by usefulness. Only use IDs from the catalog.`;
 }
