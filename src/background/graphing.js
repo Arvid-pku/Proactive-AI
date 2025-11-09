@@ -7,93 +7,66 @@ math.config({ number: 'number', precision: 14 });
 export async function graphEquation(equation) {
   const normalizedOriginal = equation ?? '';
   const fallbackEquation = normalizedOriginal.replace(/\\|{|}/g, '').trim();
-
-  try {
-    const localResult = tryLocalGraph(normalizedOriginal);
-    if (localResult) {
-      await persistGraphPayload({
-        ...localResult.graphPayload,
-        originalEquation: normalizedOriginal
-      });
-
-      notifySidePanel(localResult.graphPayload, normalizedOriginal);
-
-      return {
-        type: 'graph',
-        instruction:
-          'Equation graphed locally. View it here or open the side panel for a larger chart.',
-        originalEquation: normalizedOriginal,
-        equation: localResult.graphPayload.equations.join('; '),
-        graph: {
-          traces: localResult.graphPayload.traces,
-          layout: localResult.graphPayload.layout
-        }
-      };
-    }
-  } catch (localError) {
-    console.warn('Local graph attempt failed, falling back to AI:', localError);
-  }
+  console.log('[Graphing] Request received', {
+    length: normalizedOriginal.length,
+    preview: normalizedOriginal.slice(0, 120)
+  });
 
   try {
     const client = await getOpenAIClient();
 
-    const { normalizedEquations, graphPayload } = await withLatencyMeter(
-      'graph-equation-ai',
-      async () => {
-        const response = await client.responses.create({
-          model: 'gpt-5-mini',
-          text: {
-            format: {
-              type: 'json_schema',
-              json_schema: {
-                name: 'plotly_equations',
-                schema: {
-                  type: 'object',
-                  properties: {
-                    equations: {
-                      type: 'array',
-                      items: { type: 'string' },
-                      minItems: 1,
-                      maxItems: 4
-                    }
-                  },
-                  required: ['equations'],
-                  additionalProperties: false
+    const graphPayload = await withLatencyMeter('graph-equation-ai', async () => {
+      const response = await client.responses.create({
+        model: 'gpt-5-mini',
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'plotly_equations',
+            schema: {
+              type: 'object',
+              properties: {
+                equations: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  minItems: 1,
+                  maxItems: 4
                 }
-              }
+              },
+              required: ['equations'],
+              additionalProperties: false
             }
-          },
-          input: [
-            {
-              role: 'system',
-              content: [
-                {
-                  type: 'input_text',
-                  text: `You convert mathematical input into explicit functions of x that can be plotted with Plotly.
+          }
+        },
+        input: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text: `You convert mathematical input into explicit functions of x that can be plotted with Plotly.
 Rules:
 - Return between 1 and 4 equations solved for y using only x, numeric constants, or standard math functions (sin, cos, tan, asin, acos, atan, exp, log, ln, abs, sqrt, sinh, cosh, tanh).
 - Replace words, named functions, or parameters (lambda, penalty, ObjectiveFunction, etc.) with numeric constants.
 - Use ASCII characters only (use ^ for exponents) and avoid Unicode math symbols.`
-                }
-              ]
-            },
-            {
-              role: 'user',
-              content: [{ type: 'input_text', text: `Convert for Plotly: ${normalizedOriginal}` }]
-            }
-          ]
-        });
-
-        const payload = safeParseJSON(response.output_text);
-        const sanitizedEquations = sanitizeEquationText(payload.equations.join('; '));
-        const graphPayload = buildPlotlyPayload(sanitizedEquations);
-
-        return {
-          normalizedEquations: sanitizedEquations,
-          graphPayload
-        };
-      }
-    );
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: `Convert for Plotly: ${normalizedOriginal}` }]
+          }
+        ]
+      });
+      const payload = safeParseJSON(response.output_text);
+      console.log('[Graphing] AI normalized equations', {
+        count: payload.equations?.length ?? 0,
+        equations: payload.equations
+      });
+      const combined = Array.isArray(payload.equations)
+        ? payload.equations.join('; ')
+        : String(payload.equations ?? '');
+      return buildPlotlyPayload(combined);
+    });
 
     await persistGraphPayload({
       ...graphPayload,
@@ -101,6 +74,9 @@ Rules:
     });
 
     notifySidePanel(graphPayload, normalizedOriginal);
+    console.log('[Graphing] Graph payload stored and notification sent', {
+      traces: graphPayload.traces.length
+    });
 
     return {
       type: 'graph',
@@ -114,11 +90,13 @@ Rules:
     };
   } catch (error) {
     console.error('Equation parsing error:', error);
+    console.log('[Graphing] Falling back to sanitized local attempt');
 
     try {
       const fallbackText = sanitizeEquationText(
         fallbackEquation.includes('=') ? fallbackEquation : `y=${fallbackEquation}`
       );
+      console.log('[Graphing] Fallback equations', { fallbackText });
       const graphPayload = buildPlotlyPayload(fallbackText);
       await persistGraphPayload({
         ...graphPayload,
@@ -126,6 +104,9 @@ Rules:
       });
 
       notifySidePanel(graphPayload, normalizedOriginal);
+      console.log('[Graphing] Fallback graph stored', {
+        traces: graphPayload.traces.length
+      });
 
       return {
         type: 'graph',
@@ -142,22 +123,6 @@ Rules:
       throw new Error('Unable to generate a graph for the selected equation.');
     }
   }
-}
-
-function tryLocalGraph(equation) {
-  if (!equation) return null;
-
-  const trimmed = equation.trim();
-  if (!/[=^]/.test(trimmed)) {
-    return null;
-  }
-
-  const candidate = trimmed.includes('=')
-    ? trimmed
-    : `y=${trimmed.startsWith('y') ? trimmed.slice(1) : trimmed}`;
-  const sanitized = sanitizeEquationText(candidate);
-  const graphPayload = buildPlotlyPayload(sanitized);
-  return { graphPayload };
 }
 
 function buildPlotlyPayload(equationText) {
