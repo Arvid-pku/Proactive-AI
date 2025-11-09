@@ -54,9 +54,16 @@ document.addEventListener('mousemove', (e) => {
   mousePosition = { x: e.clientX, y: e.clientY };
 });
 
-// Track text selection
-document.addEventListener('mouseup', handleSelection);
-document.addEventListener('keyup', handleSelection);
+// Track text selection with debounce
+let selectionTimeout = null;
+document.addEventListener('mouseup', () => {
+  clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(handleSelection, 100);
+});
+document.addEventListener('keyup', () => {
+  clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(handleSelection, 100);
+});
 
 document.addEventListener('click', handleDocumentClick, true);
 
@@ -64,10 +71,13 @@ document.addEventListener('click', handleDocumentClick, true);
 window.addEventListener('message', (event) => {
   try {
     if (event.data && event.data.type === 'PROACTIVE_AI_UI_READY') {
+      console.log('🎉 UI READY signal received!');
       uiReady = true;
+      console.log('Message queue length:', uiMessageQueue.length);
       // Flush any queued UI messages
       while (uiMessageQueue.length) {
         const msg = uiMessageQueue.shift();
+        console.log('Flushing queued message:', msg.type);
         try {
           if (uiFrame && uiFrame.contentWindow) {
             uiFrame.style.pointerEvents = 'auto';
@@ -364,6 +374,12 @@ function removeImageBadge() {
 }
 
 function showAnalysisTrigger(position, { label = '', onActivate } = {}) {
+  // Don't recreate if button already exists at same position
+  if (analysisTriggerButton) {
+    console.log('Trigger button already exists, skipping recreation');
+    return;
+  }
+  
   removeAnalysisTrigger();
   
   const button = document.createElement('button');
@@ -392,16 +408,31 @@ function showAnalysisTrigger(position, { label = '', onActivate } = {}) {
   analysisTriggerHandler = (event) => {
     event.preventDefault();
     event.stopPropagation();
+    console.log('🔘 Trigger button clicked! Calling onActivate...');
     onActivate?.();
   };
   
   button.addEventListener('click', analysisTriggerHandler);
   document.body.appendChild(button);
   analysisTriggerButton = button;
+  
+  console.log('✨ Trigger button shown at', position);
+  console.log('Button element:', button);
+  console.log('Button in DOM:', document.body.contains(button));
+  console.log('Button styles:', {
+    position: button.style.position,
+    left: button.style.left,
+    top: button.style.top,
+    zIndex: button.style.zIndex,
+    display: window.getComputedStyle(button).display,
+    visibility: window.getComputedStyle(button).visibility,
+    opacity: window.getComputedStyle(button).opacity
+  });
 }
 
 function removeAnalysisTrigger() {
   if (analysisTriggerButton) {
+    console.log('🗑️ Removing trigger button');
     if (analysisTriggerHandler) {
       analysisTriggerButton.removeEventListener('click', analysisTriggerHandler);
     }
@@ -412,11 +443,20 @@ function removeAnalysisTrigger() {
 }
 
 async function runPendingAnalysis(target = pendingAnalysis) {
-  if (!target) return;
+  console.log('🚀 runPendingAnalysis START');
+  console.log('  Target exists:', !!target);
+  console.log('  Target type:', target?.type);
+  console.log('  Target text:', target?.text?.substring(0, 30));
+  
+  if (!target) {
+    console.warn('❌ No target!');
+    return;
+  }
   
   removeAnalysisTrigger();
   
   if (target.type === 'image') {
+    console.log('Image type - running OCR');
     await runImageOCR(target.element, target.position);
     return;
   }
@@ -424,34 +464,47 @@ async function runPendingAnalysis(target = pendingAnalysis) {
   target.showRequested = true;
   pendingAnalysis = target;
   
+  console.log('  showRequested:', target.showRequested);
+  console.log('  loading:', target.loading);
+  console.log('  promise exists:', !!target.promise);
+  
   if (!target.promise) {
+    console.log('📝 Creating analysis promise...');
     target.promise = preparePendingAnalysis(target);
   }
   
   if (target.loading) {
+    console.log('⏳ Target is loading, showing loading state...');
     showLoadingState(target);
     try {
       await target.promise;
+      console.log('✅ Promise resolved');
     } catch (error) {
       console.error('Analysis preparation failed:', error);
     }
     if (pendingAnalysis !== target) {
+      console.warn('Target changed during wait');
       return;
     }
+    console.log('📊 Calling showPreparedAnalysis (loading path)...');
     showPreparedAnalysis(target);
     return;
   }
   
   try {
+    console.log('⏳ Awaiting promise (non-loading)...');
     await target.promise;
+    console.log('✅ Promise complete');
   } catch (error) {
     console.error('Analysis preparation failed:', error);
   }
   
   if (pendingAnalysis !== target) {
+    console.warn('Target changed!');
     return;
   }
   
+  console.log('📊 Calling showPreparedAnalysis (final)...');
   showPreparedAnalysis(target);
 }
 
@@ -804,10 +857,38 @@ function injectUI() {
     frame.style.pointerEvents = 'none';
     container.appendChild(frame);
     uiFrame = frame;
+    
+    console.log('✅ UI iframe created');
+    
+    // Fallback: Force UI ready after 2 seconds if not ready
+    setTimeout(() => {
+      if (!uiReady) {
+        console.warn('⚠️ UI not ready after 2s, forcing ready state');
+        uiReady = true;
+        // Flush any queued messages
+        while (uiMessageQueue.length > 0) {
+          const msg = uiMessageQueue.shift();
+          try {
+            if (uiFrame && uiFrame.contentWindow) {
+              uiFrame.contentWindow.postMessage(msg, '*');
+            }
+          } catch (e) {
+            console.error('Error flushing queued message:', e);
+          }
+        }
+      }
+    }, 2000);
   } catch (e) {
+    console.error('Error creating iframe, falling back to direct script:', e);
     // Fallback to direct script injection (may be blocked by CSP)
     const script = document.createElement('script');
     script.src = chrome.runtime.getURL('ui.js');
+    script.onload = () => {
+      console.log('✅ UI script loaded (fallback)');
+      setTimeout(() => {
+        uiReady = true;
+      }, 500);
+    };
     document.head.appendChild(script);
   }
   
