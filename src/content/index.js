@@ -99,6 +99,12 @@ function handleSelection() {
   const text = selection.toString().trim();
   
   if (text.length >= MIN_TEXT_LENGTH) {
+    // Don't interrupt OCR if it's processing
+    if (pendingAnalysis && pendingAnalysis.isProcessing) {
+      console.log('OCR is processing, ignoring text selection');
+      return;
+    }
+    
     suppressNextClickReset = true;
     selectedText = text;
     removeImageBadge();
@@ -153,11 +159,18 @@ function handleSelection() {
       onActivate: () => runPendingAnalysis(target)
     });
   } else {
+    // Only clear if OCR is not processing
+    if (pendingAnalysis && pendingAnalysis.isProcessing) {
+      console.log('⛔ OCR is processing, not clearing on empty selection');
+      return;
+    }
+    
     selectedText = '';
     selectedElement = null;
     pendingAnalysis = null;
     removeAnalysisTrigger();
-    hideUI();
+    // Don't auto-hide UI - let user explicitly close it
+    // hideUI();
   }
 }
 
@@ -174,79 +187,109 @@ async function runImageOCR(element, triggerPosition = null) {
     // Update badge to processing state
     updateImageBadgeState(element, 'processing');
     
-    // Show loading indicator
-    const loadingMetadata = {
-      pageTitle: document.title || '',
-      trigger: 'image-ocr',
-      language: detectLanguageHint('', { types: ['image'], diagnostics: [] }),
-      detectorSummary: ['Image element detected (waiting for OCR confirmation).'],
-      sourceUrl: location.href,
-      contentLength: 0,
-      elementTag: element?.tagName || '',
-      timestamp: Date.now(),
-      isOCR: true
-    };
-    
     const rect = element.getBoundingClientRect();
     const anchorPosition = computeUpperRightPosition(rect);
     
-    showUI({
-      tools: ['ocr_image'],
-      content: 'Analyzing image...',
+    // Create target BEFORE OCR with placeholder text
+    const target = {
+      type: 'text',
+      text: 'Analyzing image...',  // Placeholder
+      element,
       position: anchorPosition,
-      contentTypes: ['image'],
       trigger: 'image-ocr',
+      isOCR: true,
+      ocrConfidence: null,
+      showRequested: true,
       loading: true,
-      metadata: loadingMetadata
-    });
+      tools: ['ocr_image'],  // Default tool while loading
+      promise: null,
+      contentTypes: ['image'],
+      isProcessing: true  // Flag to prevent clicks from hiding UI
+    };
+    
+    pendingAnalysis = target;
+    
+    // Show loading UI immediately
+    showLoadingState(target);
+    
+    console.log('🔄 OCR: Loading UI shown, starting OCR...');
     
     // Perform OCR
     const ocrResult = await extractTextFromImage(element);
     
+    console.log('🔄 OCR: OCR completed, result:', ocrResult ? 'success' : 'failed');
+    
     if (ocrResult && ocrResult.text) {
       console.log(`OCR found ${ocrResult.words} words (confidence: ${ocrResult.confidence.toFixed(1)}%)`);
       
-      // Update badge to success state
-      updateImageBadgeState(element, 'success');
+      // Keep badge in processing state - don't mark as success yet
+      // It will turn green after UI is fully shown
       
-      const analysisPosition = anchorPosition;
-      const target = {
-        type: 'text',
-        text: ocrResult.text,
-        element,
-        position: analysisPosition,
-        trigger: 'image-ocr',
-        isOCR: true,
-        ocrConfidence: ocrResult.confidence,
-        showRequested: true,
-        loading: true,
-        tools: null,
-        promise: null
-      };
+      // Update target with OCR result
+      target.text = ocrResult.text;
+      target.ocrConfidence = ocrResult.confidence;
+      // Don't set loading to false here - preparePendingAnalysis will manage it
       
+      console.log('🔄 OCR: Preparing analysis...');
+      
+      // Now prepare analysis with the actual text
       target.promise = preparePendingAnalysis(target);
-      pendingAnalysis = target;
       
-      target.promise.then(() => {
-        if (pendingAnalysis === target && target.showRequested) {
-          showPreparedAnalysis(target);
-        }
-      }).catch((error) => {
-        console.error('OCR follow-up analysis failed:', error);
-        if (pendingAnalysis === target && target.showRequested) {
-          showPreparedAnalysis(target);
-        }
-      });
+      // Wait for analysis to complete, then show result
+      await target.promise;
+      
+      console.log('🔄 OCR: Analysis complete');
+      console.log('  pendingAnalysis === target?', pendingAnalysis === target);
+      console.log('  target.loading:', target.loading);
+      console.log('  target.tools:', target.tools);
+      
+      if (pendingAnalysis === target) {
+        console.log('🔄 OCR: Showing prepared analysis...');
+        showPreparedAnalysis(target);
+        console.log('🔄 OCR: showPreparedAnalysis returned');
+        
+        // NOW mark badge as success - UI is shown
+        updateImageBadgeState(element, 'success');
+        
+        // CRITICAL: Keep isProcessing=true for a moment to prevent immediate hiding
+        // UI needs time to render and stabilize before we allow clicks to affect it
+        setTimeout(() => {
+          console.log('🔄 OCR: Clearing isProcessing flag after UI stabilized');
+          if (target) {
+            target.isProcessing = false;
+          }
+        }, 300);
+        
+        // Add a small delay to check if UI is still visible
+        setTimeout(() => {
+          console.log('🔄 OCR: Checking UI visibility after 100ms');
+          if (uiFrame) {
+            console.log('  iframe display:', uiFrame.style.display);
+          }
+        }, 100);
+      } else {
+        console.warn('🔄 OCR: pendingAnalysis changed, not showing UI');
+      }
     } else {
       console.warn('No text found in image');
       removeImageBadge();
-      hideUI();
+      // Don't auto-hide - user can manually dismiss
+      // hideUI();
     }
   } catch (error) {
     console.error('OCR Error:', error);
-    // Show error or hide UI
     removeImageBadge();
-    hideUI();
+    // Don't auto-hide on error - user can manually dismiss
+    // hideUI();
+  } finally {
+    // Always clear isProcessing flag when OCR completes or fails
+    if (pendingAnalysis && pendingAnalysis.isProcessing) {
+      setTimeout(() => {
+        if (pendingAnalysis) {
+          pendingAnalysis.isProcessing = false;
+        }
+      }, 500);
+    }
   }
 }
 
@@ -270,7 +313,7 @@ function showImageBadge(element, clickPosition = null) {
   badge.className = 'proactive-ai-ocr-badge';
   badge.title = 'Click to extract text from this image';
   badge.type = 'button';
-  badge.textContent = '';
+  badge.textContent = ''; // Empty like the text trigger button
   badge.setAttribute('aria-label', 'Extract text with AI');
   
   const rect = element.getBoundingClientRect();
@@ -323,31 +366,22 @@ function updateImageBadgeState(element, state) {
     element.classList.add('proactive-ai-ocr-processing');
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
       currentOCRBadge.classList.add('is-processing');
-      currentOCRBadge.textContent = '...';
+      currentOCRBadge.textContent = ''; // Keep empty during processing
       currentOCRBadge.disabled = true;
     }
   } else if (state === 'success') {
     element.classList.add('proactive-ai-ocr-success');
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
       currentOCRBadge.classList.add('is-success');
-      currentOCRBadge.textContent = '✓';
+      currentOCRBadge.textContent = ''; // Keep empty on success
+      currentOCRBadge.disabled = false; // Re-enable so it can be clicked again
     }
-    
-    // Auto-remove success state after 2 seconds
-    setTimeout(() => {
-      if (element.classList.contains('proactive-ai-ocr-success')) {
-        element.classList.remove('proactive-ai-ocr-success');
-      }
-      if (currentOCRBadge && currentOCRBadgeTarget === element) {
-        currentOCRBadge.classList.remove('is-processing', 'is-success');
-        currentOCRBadge.textContent = 'OCR';
-        currentOCRBadge.disabled = false;
-      }
-    }, 2000);
+    // Keep the success state - don't auto-remove it
+    // It will be removed when user clicks outside (removeImageBadge)
   } else {
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
       currentOCRBadge.classList.remove('is-processing', 'is-success');
-      currentOCRBadge.textContent = 'OCR';
+      currentOCRBadge.textContent = ''; // Keep empty
       currentOCRBadge.disabled = false;
     }
   }
@@ -442,6 +476,21 @@ function removeAnalysisTrigger() {
   }
 }
 
+/**
+ * Update analysis trigger button state (processing, success)
+ */
+function updateAnalysisTriggerState(state) {
+  if (!analysisTriggerButton) return;
+  
+  analysisTriggerButton.classList.remove('is-processing', 'is-success');
+  
+  if (state === 'processing') {
+    analysisTriggerButton.classList.add('is-processing');
+  } else if (state === 'success') {
+    analysisTriggerButton.classList.add('is-success');
+  }
+}
+
 async function runPendingAnalysis(target = pendingAnalysis) {
   console.log('🚀 runPendingAnalysis START');
   console.log('  Target exists:', !!target);
@@ -453,13 +502,14 @@ async function runPendingAnalysis(target = pendingAnalysis) {
     return;
   }
   
-  removeAnalysisTrigger();
-  
   if (target.type === 'image') {
     console.log('Image type - running OCR');
     await runImageOCR(target.element, target.position);
     return;
   }
+  
+  // Mark as BLUE (processing) when user clicks the trigger
+  updateAnalysisTriggerState('processing');
   
   target.showRequested = true;
   pendingAnalysis = target;
@@ -482,9 +532,10 @@ async function runPendingAnalysis(target = pendingAnalysis) {
     } catch (error) {
       console.error('Analysis preparation failed:', error);
     }
-    // Don't check if target changed - just show it anyway!
     console.log('📊 Calling showPreparedAnalysis (loading path)...');
     showPreparedAnalysis(target);
+    // Mark as GREEN (success) after UI is shown
+    updateAnalysisTriggerState('success');
     return;
   }
   
@@ -496,9 +547,10 @@ async function runPendingAnalysis(target = pendingAnalysis) {
     console.error('Analysis preparation failed:', error);
   }
   
-  // Always show the analysis for the target we started with
   console.log('📊 Calling showPreparedAnalysis (final)...');
   showPreparedAnalysis(target);
+  // Mark as GREEN (success) after UI is shown
+  updateAnalysisTriggerState('success');
 }
 
 function handleDocumentClick(event) {
@@ -527,30 +579,57 @@ function handleDocumentClick(event) {
   
   // If clicking on an image, show OCR badge
   if (isImage(event.target)) {
+    // Don't interrupt OCR if it's processing
+    if (pendingAnalysis && pendingAnalysis.isProcessing) {
+      console.log('OCR is processing, ignoring image click');
+      return;
+    }
+    
     event.preventDefault();
     event.stopPropagation();
     selectedText = '';
     selectedElement = event.target;
     const rect = event.target.getBoundingClientRect();
     const triggerPosition = computeUpperRightPosition(rect);
+    
+    // Create new pending analysis for this image
     pendingAnalysis = {
       type: 'image',
       element: event.target,
       position: triggerPosition,
       trigger: 'image-click'
     };
+    
     showImageBadge(event.target);
     removeAnalysisTrigger();
-    hideUI();
+    // DON'T call hideUI() here - it would hide UI that just appeared from OCR!
+    // The UI will be hidden when user clicks outside or selects new content
     return;
   }
   
   // Clicked outside - remove trigger and hide UI
   console.log('Click outside UI/trigger, hiding');
+  console.log('  pendingAnalysis:', pendingAnalysis);
+  console.log('  pendingAnalysis.isProcessing:', pendingAnalysis?.isProcessing);
+  
+  // Don't hide UI or clear pendingAnalysis if OCR is processing
+  if (pendingAnalysis && pendingAnalysis.isProcessing) {
+    console.log('⛔ OCR is processing, BLOCKING all state changes!');
+    return;
+  }
+  
+  console.log('🚨 Clearing pendingAnalysis!');
+  
+  // Clear pendingAnalysis first
+  pendingAnalysis = null;
+  
+  // Remove both trigger button and OCR badge
   if (analysisTriggerButton) {
     removeAnalysisTrigger();
-    pendingAnalysis = null;
   }
+  removeImageBadge();
+  
+  // Hide UI when clicking outside
   hideUI();
 }
 
@@ -658,10 +737,18 @@ async function preparePendingAnalysis(target) {
     };
   } else {
     try {
-      response = await chrome.runtime.sendMessage({
+      // Add timeout protection to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout after 10 seconds')), 10000);
+      });
+      
+      const messagePromise = chrome.runtime.sendMessage({
         action: 'GET_TOOL_SUGGESTIONS',
         data: requestPayload
       });
+      
+      response = await Promise.race([messagePromise, timeoutPromise]);
+      
       if (response && response.success) {
         lastSuggestionKey = cacheKey;
         lastSuggestionResult = response;
@@ -671,6 +758,8 @@ async function preparePendingAnalysis(target) {
       if (error?.message?.includes('Extension context invalidated')) {
         console.warn('Extension was reloaded. Request aborted.');
         alert('Proactive AI Assistant was updated. Please refresh this page (F5) to continue using it.');
+      } else if (error?.message?.includes('timeout')) {
+        console.error('Request timed out:', error);
       } else {
         console.error('Error requesting tool suggestions:', error);
       }
@@ -678,7 +767,15 @@ async function preparePendingAnalysis(target) {
     }
   }
   
+  console.log('📊 preparePendingAnalysis: Checking if target is still pending...');
+  console.log('  pendingAnalysis === target?', pendingAnalysis === target);
+  console.log('  pendingAnalysis:', pendingAnalysis);
+  console.log('  target:', target);
+  console.log('  target.requestId:', target.requestId);
+  console.log('  requestId:', requestId);
+  
   if (pendingAnalysis !== target || target.requestId !== requestId) {
+    console.warn('📊 preparePendingAnalysis: Target changed or request ID mismatch, aborting');
     return;
   }
   
@@ -782,6 +879,7 @@ function showUI({
  */
 function hideUI() {
   console.log('🙈 Hiding UI');
+  console.trace('hideUI called from:'); // 添加堆栈追踪
   const msg = { type: 'PROACTIVE_AI_HIDE' };
   try {
     if (uiFrame && uiFrame.contentWindow) {
@@ -960,6 +1058,12 @@ window.addEventListener('message', async (event) => {
       currentMetadata = providedMetadata;
     }
     
+    // Mark trigger/badge as processing (blue) when tool execution starts
+    updateAnalysisTriggerState('processing');
+    if (currentOCRBadgeTarget) {
+      updateImageBadgeState(currentOCRBadgeTarget, 'processing');
+    }
+    
     try {
       // Special handling for graph_equation - execute first, then open panel
       if (toolId === 'graph_equation') {
@@ -993,6 +1097,12 @@ window.addEventListener('message', async (event) => {
             window.postMessage(msg, '*');
           }
         } catch (_) {}
+        
+        // Mark as success (green) after tool completes
+        updateAnalysisTriggerState('success');
+        if (currentOCRBadgeTarget) {
+          updateImageBadgeState(currentOCRBadgeTarget, 'success');
+        }
 
         return;
       }
@@ -1023,6 +1133,12 @@ window.addEventListener('message', async (event) => {
         }
       } catch (_) {}
       
+      // Mark as success (green) after tool completes
+      updateAnalysisTriggerState('success');
+      if (currentOCRBadgeTarget) {
+        updateImageBadgeState(currentOCRBadgeTarget, 'success');
+      }
+      
       // Handle specific result types
       if (response && response.success && response.result) {
         handleToolResult(response.result, toolId);
@@ -1037,6 +1153,12 @@ window.addEventListener('message', async (event) => {
           error: error.message || 'Failed to execute tool'
         }
       }, '*');
+      
+      // Mark as success (green) even on error - tool execution finished
+      updateAnalysisTriggerState('success');
+      if (currentOCRBadgeTarget) {
+        updateImageBadgeState(currentOCRBadgeTarget, 'success');
+      }
     }
   }
 });
