@@ -482,10 +482,7 @@ async function runPendingAnalysis(target = pendingAnalysis) {
     } catch (error) {
       console.error('Analysis preparation failed:', error);
     }
-    if (pendingAnalysis !== target) {
-      console.warn('Target changed during wait');
-      return;
-    }
+    // Don't check if target changed - just show it anyway!
     console.log('📊 Calling showPreparedAnalysis (loading path)...');
     showPreparedAnalysis(target);
     return;
@@ -499,11 +496,7 @@ async function runPendingAnalysis(target = pendingAnalysis) {
     console.error('Analysis preparation failed:', error);
   }
   
-  if (pendingAnalysis !== target) {
-    console.warn('Target changed!');
-    return;
-  }
-  
+  // Always show the analysis for the target we started with
   console.log('📊 Calling showPreparedAnalysis (final)...');
   showPreparedAnalysis(target);
 }
@@ -711,8 +704,14 @@ function showUI({
   ocrConfidence = null,
   metadata = null
 }) {
+  console.log('📢 showUI called!');
+  console.log('  loading:', loading);
+  console.log('  tools:', tools);
+  console.log('  uiReady:', uiReady);
+  
   // Ensure UI is injected before attempting to show
   if (!uiInjected) {
+    console.log('Injecting UI...');
     injectUI();
   }
 
@@ -741,6 +740,7 @@ function showUI({
 
   // If UI hasn't finished initializing yet, queue the message
   if (!uiReady) {
+    console.log('⏳ UI not ready yet, queueing message');
     uiMessageQueue.push(message);
   }
   // Also attempt to post immediately in case UI is already ready
@@ -752,11 +752,15 @@ function showUI({
     if (uiFrame && uiFrame.contentWindow) {
       // Enable interactions while UI is visible
       uiFrame.style.pointerEvents = 'auto';
+      console.log('✅ Sending message to UI iframe');
       uiFrame.contentWindow.postMessage(message, '*');
     } else {
+      console.log('✅ Sending message to window (no iframe)');
       window.postMessage(message, '*');
     }
-  } catch (_) {}
+  } catch (e) {
+    console.error('Error sending to UI:', e);
+  }
   
   // Inject UI if not already injected
   // (already ensured above)
