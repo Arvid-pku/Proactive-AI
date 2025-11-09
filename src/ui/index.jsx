@@ -80,14 +80,13 @@ function ProactiveAI() {
   }, []);
 
   // Adjust position to keep UI on screen
+  // Since iframe is positioned at trigger position, UI should be at (0,0) inside iframe
+  // But add small offset to avoid cutoff
   const adjustPosition = (pos) => {
-    const padding = 20;
-    const maxX = window.innerWidth - 320 - padding;
-    const maxY = window.innerHeight - 400 - padding;
-    
+    // Position at top-left of iframe with small padding
     return {
-      x: Math.min(Math.max(pos.x, padding), maxX),
-      y: Math.min(Math.max(pos.y, padding), maxY)
+      x: 1,  // Small offset from left edge of iframe
+      y: 1   // Small offset from top edge of iframe
     };
   };
 
