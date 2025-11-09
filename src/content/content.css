@@ -107,27 +107,42 @@
   outline-color: rgba(182, 131, 85, 0.5) !important;
 }
 
-/* Processing state */
+/* Processing state - blue outline */
 .proactive-ai-ocr-processing {
-  outline: 2px solid rgba(255, 149, 0, 0.6) !important;
+  outline: 2px solid rgba(0, 122, 255, 0.6) !important;
 }
 
-/* Success state */
+/* Success state - green outline */
 .proactive-ai-ocr-success {
-  outline: 2px solid rgba(52, 199, 89, 0.55) !important;
+  outline: 2px solid rgba(52, 199, 89, 0.6) !important;
 }
 
 .proactive-ai-ocr-badge.is-processing {
-  color: #ff9500 !important;
-  border-color: rgba(255, 149, 0, 0.3) !important;
+  color: #007aff !important;
+  border-color: rgba(0, 122, 255, 0.3) !important;
   animation: proactive-ai-spin 1s linear infinite !important;
-  background: radial-gradient(circle at center, #ffffff 40%, #ffe5c2 41%, #ff9500) !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #d1e9ff 41%, #007aff) !important;
 }
 
 .proactive-ai-ocr-badge.is-success {
   color: #34c759 !important;
   border-color: rgba(52, 199, 89, 0.3) !important;
-  animation: proactive-ai-bounce 0.6s ease !important;
+  animation: none !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #d5f5df 41%, #34c759) !important;
+}
+
+/* Same states for text trigger button */
+.proactive-ai-trigger.is-processing {
+  color: #007aff !important;
+  border-color: rgba(0, 122, 255, 0.3) !important;
+  animation: proactive-ai-pulse 1s ease-in-out infinite !important;
+  background: radial-gradient(circle at center, #ffffff 40%, #d1e9ff 41%, #007aff) !important;
+}
+
+.proactive-ai-trigger.is-success {
+  color: #34c759 !important;
+  border-color: rgba(52, 199, 89, 0.3) !important;
+  animation: none !important;
   background: radial-gradient(circle at center, #ffffff 40%, #d5f5df 41%, #34c759) !important;
 }
 

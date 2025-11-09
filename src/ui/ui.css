@@ -48,6 +48,13 @@
   background: transparent;
   color: var(--text-color);
   border-bottom: 1px solid var(--border-color);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.proactive-ai-header[data-dragging='true'] {
+  cursor: grabbing;
 }
 
 .proactive-ai-title {
