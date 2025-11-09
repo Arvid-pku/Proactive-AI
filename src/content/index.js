@@ -694,30 +694,17 @@ function handleDocumentClick(event) {
   hideUI();
 }
 
-const FALLBACK_TOOLS = {
-  math: ['graph_equation', 'explain_math'],
-  code: ['explain_code', 'debug_code'],
-  text: ['summarize', 'explain_text'],
-  foreign: ['translate', 'pronounce'],
-  chemical: ['visualize_chemical'],
-  table: ['export_table', 'visualize_data'],
-  citation: ['fetch_citation', 'summarize'],
-  url: ['check_link', 'summarize'],
-  image: ['ocr_image', 'summarize']
-};
+const GENERIC_FALLBACK_TOOLS = ['save_note', 'summarize', 'explain_text'];
 
-function computeFallbackTools(contentTypes = []) {
-  const tools = contentTypes
-    .flatMap(type => FALLBACK_TOOLS[type] || [])
-    .slice(0, 4);
-  return tools.length ? tools : ['save_note', 'summarize'];
+function computeFallbackTools() {
+  return GENERIC_FALLBACK_TOOLS.slice(0, 4);
 }
 
 function showLoadingState(target) {
   const loadingTools =
     (Array.isArray(target.tools) && target.tools.length > 0)
       ? target.tools
-      : computeFallbackTools(target.contentTypes || []);
+      : computeFallbackTools();
       
   showUI({
     tools: loadingTools,
@@ -736,7 +723,7 @@ function showPreparedAnalysis(target) {
   const preparedTools =
     (Array.isArray(target.tools) && target.tools.length > 0)
       ? target.tools
-      : computeFallbackTools(target.contentTypes || []);
+      : computeFallbackTools();
   
   showUI({
     tools: preparedTools,
@@ -849,12 +836,12 @@ async function preparePendingAnalysis(target) {
     target.tools = response.tools.slice(0, 4);
     target.response = response;
   } else {
-    target.tools = computeFallbackTools(contentTypes);
+    target.tools = computeFallbackTools();
     target.response = { success: false, fallback: true, tools: target.tools };
   }
   
   if (!target.tools || target.tools.length === 0) {
-    target.tools = computeFallbackTools(contentTypes);
+    target.tools = computeFallbackTools();
   }
 
   return target;
@@ -962,7 +949,7 @@ function hideUI() {
 }
 
 function buildSelectionMetadata({ text, element, analysis, trigger, context, isOCR, ocrConfidence }) {
-  const language = detectLanguageHint(text, analysis);
+  const language = detectLanguageHint(text);
   const metadata = {
     pageTitle: document.title || '',
     language,
@@ -970,7 +957,7 @@ function buildSelectionMetadata({ text, element, analysis, trigger, context, isO
     trigger,
     sourceUrl: location.href,
     contentLength: text.length,
-    elementTag: element?.tagName || '',
+    elementTag: analysis.elementTag || element?.tagName || '',
     timestamp: Date.now(),
     contextSnippet: context.slice(-300)
   };
@@ -986,17 +973,21 @@ function buildSelectionMetadata({ text, element, analysis, trigger, context, isO
   if (elementLang) {
     metadata.elementLanguage = elementLang;
   }
+
+  if (analysis.elementSnapshot) {
+    metadata.elementSnapshot = analysis.elementSnapshot;
+  }
   
   return metadata;
 }
 
-function detectLanguageHint(text, analysis) {
+function detectLanguageHint(text) {
   const docLang = document.documentElement?.lang;
   const navigatorLang = navigator.language;
   let hint = docLang || navigatorLang || '';
   
-  if (analysis.types.includes('foreign')) {
-    const nonLatinHint = containsNonLatin(text) ? 'non-Latin characters detected' : 'foreign language detected';
+  if (containsNonLatin(text)) {
+    const nonLatinHint = 'non-Latin characters detected';
     hint = hint ? `${hint}; ${nonLatinHint}` : nonLatinHint;
   }
   
