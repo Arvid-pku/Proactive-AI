@@ -3,7 +3,7 @@
  * React-based interface for displaying tools and results
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import './ui.css';
 import { TOOL_DEFINITIONS } from '../utils/toolDefinitions.js';
@@ -11,7 +11,8 @@ import Plotly from 'plotly.js-dist-min';
 
 function ProactiveAI() {
   const [isVisible, setIsVisible] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const DEFAULT_OFFSET = 8;
+  const [position, setPosition] = useState({ x: DEFAULT_OFFSET, y: DEFAULT_OFFSET });
   const [tools, setTools] = useState([]);
   const [content, setContent] = useState('');
   const [fullContent, setFullContent] = useState('');
@@ -20,29 +21,135 @@ function ProactiveAI() {
   const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState('tools'); // 'tools' or 'result'
   const [metadata, setMetadata] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   
   const containerRef = useRef(null);
+  const dragStateRef = useRef({
+    pointerId: null,
+    lastClientX: 0,
+    lastClientY: 0,
+    originalUserSelect: ''
+  });
+
+  const handlePointerDown = useCallback((event) => {
+    if (event.target.closest('.proactive-ai-close')) {
+      return;
+    }
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      lastClientX: event.clientX,
+      lastClientY: event.clientY,
+      originalUserSelect: typeof document !== 'undefined' ? document.body.style.userSelect : ''
+    };
+
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = 'none';
+    }
+  }, []);
+
+  const handlePointerMove = useCallback((event) => {
+    if (dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    event.preventDefault();
+
+    const { lastClientX, lastClientY } = dragStateRef.current;
+    const deltaX = event.clientX - lastClientX;
+    const deltaY = event.clientY - lastClientY;
+    dragStateRef.current.lastClientX = event.clientX;
+    dragStateRef.current.lastClientY = event.clientY;
+
+    if (deltaX || deltaY) {
+      const dragMessage = {
+        type: 'PROACTIVE_AI_DRAG_DELTA',
+        payload: { deltaX, deltaY }
+      };
+      try {
+        window.postMessage(dragMessage, '*');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(dragMessage, '*');
+        }
+      } catch (error) {
+        console.error('Failed to notify parent about drag delta:', error);
+      }
+    }
+  }, []);
+
+  const handlePointerUp = useCallback((event) => {
+    if (dragStateRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    const { originalUserSelect } = dragStateRef.current;
+    dragStateRef.current = {
+      pointerId: null,
+      lastClientX: 0,
+      lastClientY: 0,
+      originalUserSelect: ''
+    };
+    setIsDragging(false);
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = originalUserSelect;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.userSelect = dragStateRef.current.originalUserSelect || '';
+      }
+      dragStateRef.current = {
+        pointerId: null,
+        lastClientX: 0,
+        lastClientY: 0,
+        originalUserSelect: ''
+      };
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible && isDragging) {
+      if (typeof document !== 'undefined') {
+        document.body.style.userSelect = dragStateRef.current.originalUserSelect || '';
+      }
+      dragStateRef.current = {
+        pointerId: null,
+        lastClientX: 0,
+        lastClientY: 0,
+        originalUserSelect: ''
+      };
+      setIsDragging(false);
+    }
+  }, [isVisible, isDragging]);
 
   useEffect(() => {
     // Listen for messages from content script
     const handleMessage = (event) => {
       if (event.data.type === 'PROACTIVE_AI_SHOW') {
         const {
-          tools,
-          content,
-          fullContent,
-          position,
-          contentTypes,
-          metadata,
-          loading
+          tools: incomingTools,
+          content: snippet,
+          fullContent: full,
+          position: triggerPosition,
+          contentTypes: detectedTypes,
+          metadata: incomingMetadata,
+          loading: isLoading
         } = event.data.payload;
-        setTools(tools);
-        setContent(content);
-        setFullContent(fullContent);
-        setPosition(adjustPosition(position));
-        setContentTypes(contentTypes);
-        setMetadata(metadata || null);
-        setLoading(Boolean(loading));
+        setTools(incomingTools);
+        setContent(snippet);
+    setFullContent(full);
+    setPosition({ x: DEFAULT_OFFSET, y: DEFAULT_OFFSET });
+        setContentTypes(detectedTypes);
+        setMetadata(incomingMetadata || null);
+        setLoading(Boolean(isLoading));
         setIsVisible(true);
         setActiveView('tools');
         setResult(null);
@@ -77,18 +184,11 @@ function ProactiveAI() {
       // ignore
     }
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [DEFAULT_OFFSET]);
 
   // Adjust position to keep UI on screen
   // Since iframe is positioned at trigger position, UI should be at (0,0) inside iframe
   // But add small offset to avoid cutoff
-  const adjustPosition = (pos) => {
-    // Position at top-left of iframe with small padding
-    return {
-      x: 1,  // Small offset from left edge of iframe
-      y: 1   // Small offset from top edge of iframe
-    };
-  };
 
   // Handle tool click
   const handleToolClick = (toolId) => {
@@ -133,7 +233,14 @@ function ProactiveAI() {
         top: `${position.y}px`
       }}
     >
-      <div className="proactive-ai-header">
+      <div
+        className="proactive-ai-header"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        data-dragging={isDragging ? 'true' : 'false'}
+      >
         <div className="proactive-ai-title">
           <span>Proactive Assistant</span>
         </div>
@@ -149,25 +256,6 @@ function ProactiveAI() {
             )}
           </div>
 
-          {(metadata?.detectorSummary?.length || metadata?.language) && (
-            <div className="proactive-ai-context">
-              {metadata?.detectorSummary?.length ? (
-                <div className="proactive-ai-context-section">
-                  <div className="proactive-ai-context-title">Why these tools</div>
-                  <ul className="proactive-ai-context-list">
-                    {metadata.detectorSummary.map((hint, index) => (
-                      <li key={`${hint}-${index}`}>{hint}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {metadata?.language && metadata.language !== 'unknown' && (
-                <div className="proactive-ai-context-meta">
-                  Detected language: <strong>{metadata.language}</strong>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="proactive-ai-tools">
             {tools.map(toolId => {
