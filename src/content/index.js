@@ -105,6 +105,12 @@ function handleSelection() {
       return;
     }
     
+    // Cancel any pending badge removal
+    if (badgeRemovalTimeout) {
+      clearTimeout(badgeRemovalTimeout);
+      badgeRemovalTimeout = null;
+    }
+    
     suppressNextClickReset = true;
     selectedText = text;
     removeImageBadge();
@@ -338,9 +344,52 @@ function showImageBadge(element, clickPosition = null) {
   const handler = (event) => {
     event.stopPropagation();
     event.preventDefault();
+    
+    // Cancel any removal timeout when clicking badge
+    if (badgeRemovalTimeout) {
+      clearTimeout(badgeRemovalTimeout);
+      badgeRemovalTimeout = null;
+    }
+    
+    // Cancel hover timeout
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      hoverTimeout = null;
+    }
+    
     runImageOCR(element, { x: event.clientX, y: event.clientY });
   };
   badge.addEventListener('click', handler);
+  
+  // Also cancel removal timeout when hovering over badge
+  badge.addEventListener('mouseenter', () => {
+    // Cancel ALL timeouts when hovering badge
+    if (badgeRemovalTimeout) {
+      clearTimeout(badgeRemovalTimeout);
+      badgeRemovalTimeout = null;
+    }
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout);
+      hoverTimeout = null;
+    }
+  });
+  
+  // When mouse leaves badge, start removal timer
+  badge.addEventListener('mouseleave', (e) => {
+    const relatedTarget = e.relatedTarget;
+    // If not going back to the image, schedule removal
+    if (relatedTarget && relatedTarget !== element && !element.contains(relatedTarget)) {
+      if (badgeRemovalTimeout) {
+        clearTimeout(badgeRemovalTimeout);
+      }
+      badgeRemovalTimeout = setTimeout(() => {
+        if (currentOCRBadge === badge && (!pendingAnalysis || !pendingAnalysis.isProcessing)) {
+          removeImageBadge();
+        }
+        badgeRemovalTimeout = null;
+      }, 2000);
+    }
+  });
   
   document.body.appendChild(badge);
   currentOCRBadge = badge;
@@ -577,35 +626,7 @@ function handleDocumentClick(event) {
     return;
   }
   
-  // If clicking on an image, show OCR badge
-  if (isImage(event.target)) {
-    // Don't interrupt OCR if it's processing
-    if (pendingAnalysis && pendingAnalysis.isProcessing) {
-      console.log('OCR is processing, ignoring image click');
-      return;
-    }
-    
-    event.preventDefault();
-    event.stopPropagation();
-    selectedText = '';
-    selectedElement = event.target;
-    const rect = event.target.getBoundingClientRect();
-    const triggerPosition = computeUpperRightPosition(rect);
-    
-    // Create new pending analysis for this image
-    pendingAnalysis = {
-      type: 'image',
-      element: event.target,
-      position: triggerPosition,
-      trigger: 'image-click'
-    };
-    
-    showImageBadge(event.target);
-    removeAnalysisTrigger();
-    // DON'T call hideUI() here - it would hide UI that just appeared from OCR!
-    // The UI will be hidden when user clicks outside or selects new content
-    return;
-  }
+  // Don't handle image clicks anymore - using hover instead
   
   // Clicked outside - remove trigger and hide UI
   console.log('Click outside UI/trigger, hiding');
@@ -1177,6 +1198,106 @@ function handleToolResult(result, toolId) {
   }
   // Text results are handled by UI
 }
+
+/**
+ * Handle image hover to show OCR badge
+ */
+let hoverTimeout = null;
+let badgeRemovalTimeout = null;
+let lastHoveredImage = null;
+
+document.addEventListener('mouseover', (event) => {
+  // Clear previous timeout
+  if (hoverTimeout) {
+    clearTimeout(hoverTimeout);
+    hoverTimeout = null;
+  }
+  
+  // Check if hovering over an image
+  if (isImage(event.target)) {
+    // Don't show badge if OCR is processing
+    if (pendingAnalysis && pendingAnalysis.isProcessing) {
+      return;
+    }
+    
+    // Don't show badge if already showing for this image
+    if (currentOCRBadgeTarget === event.target) {
+      // Cancel auto-removal if hovering back over the same image
+      if (badgeRemovalTimeout) {
+        clearTimeout(badgeRemovalTimeout);
+        badgeRemovalTimeout = null;
+      }
+      return;
+    }
+    
+    // Don't show badge on our own UI elements
+    if (event.target.closest && event.target.closest('#proactive-ai-root')) {
+      return;
+    }
+    
+    lastHoveredImage = event.target;
+    
+    // Show badge after a short delay (300ms) to avoid showing on quick mouse movements
+    hoverTimeout = setTimeout(() => {
+      if (lastHoveredImage === event.target) {
+        // Don't create badge if it already exists for this image
+        if (currentOCRBadgeTarget === event.target) {
+          return;
+        }
+        
+        // Cancel any pending removal
+        if (badgeRemovalTimeout) {
+          clearTimeout(badgeRemovalTimeout);
+          badgeRemovalTimeout = null;
+        }
+        
+        selectedText = '';
+        selectedElement = event.target;
+        const rect = event.target.getBoundingClientRect();
+        const triggerPosition = computeUpperRightPosition(rect);
+        
+        pendingAnalysis = {
+          type: 'image',
+          element: event.target,
+          position: triggerPosition,
+          trigger: 'image-hover'
+        };
+        
+        showImageBadge(event.target);
+        removeAnalysisTrigger();
+      }
+    }, 300);
+  }
+}, true); // Use capture phase to catch events early
+
+document.addEventListener('mouseout', (event) => {
+  // When mouse leaves an image with badge, schedule removal after 2 seconds
+  if (isImage(event.target) && currentOCRBadgeTarget === event.target) {
+    // Check if mouse is moving to the badge itself
+    const relatedTarget = event.relatedTarget;
+    if (relatedTarget && 
+        (relatedTarget === currentOCRBadge || 
+         (relatedTarget.closest && relatedTarget.closest('.proactive-ai-ocr-badge')))) {
+      // Mouse moved to the badge, don't schedule removal
+      return;
+    }
+    
+    // Clear any existing removal timeout
+    if (badgeRemovalTimeout) {
+      clearTimeout(badgeRemovalTimeout);
+    }
+    
+    // Schedule badge removal after 2 seconds
+    badgeRemovalTimeout = setTimeout(() => {
+      // Only remove if not processing and badge is still for this element
+      if (currentOCRBadgeTarget === event.target && 
+          (!pendingAnalysis || !pendingAnalysis.isProcessing)) {
+        removeImageBadge();
+      }
+      badgeRemovalTimeout = null;
+    }, 2000);
+  }
+}, true);
 
 console.log('Proactive AI Assistant content script loaded');
 
