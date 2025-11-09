@@ -146,7 +146,10 @@ function buildUserPrompt({ content, context, contentTypes, metadata }) {
   const summary = Array.isArray(metadata?.detectorSummary) ? metadata.detectorSummary.join('; ') : '';
   const pageTitle = metadata?.pageTitle ? `Page title: ${metadata.pageTitle}\n` : '';
   const language = metadata?.language ? `Language hint: ${metadata.language}\n` : '';
-  const types = Array.isArray(contentTypes) && contentTypes.length ? contentTypes.join(', ') : 'unknown';
+  const elementTag = metadata?.elementTag ? `Element tag: ${metadata.elementTag}\n` : '';
+  const elementLang = metadata?.elementLanguage ? `Element lang attribute: ${metadata.elementLanguage}\n` : '';
+  const snapshot = metadata?.elementSnapshot ? `Element HTML snippet (trimmed):\n${metadata.elementSnapshot}\n\n` : '';
+  const types = Array.isArray(contentTypes) && contentTypes.length ? contentTypes.join(', ') : 'none';
 
   const selection = String(content || '');
   const ctx = String(context || '');
@@ -154,12 +157,11 @@ function buildUserPrompt({ content, context, contentTypes, metadata }) {
   const charCount = selection.length;
   const ctxCharCount = ctx.length;
 
-  return `${pageTitle}${language}${summary ? `Heuristics: ${summary}\n` : ''}
-Selection (trimmed):\n${selection}
+  return `${pageTitle}${language}${elementTag}${elementLang}${summary ? `Analysis summary: ${summary}\n` : ''}${snapshot}Selection (trimmed):\n${selection}
 \nSelection stats: ~${charCount} chars, ~${wordCount} words
 \nNearby context (trimmed):\n${ctx}
 \nContext stats: ~${ctxCharCount} chars
-\nDetected types: ${types}. Rank up to 4 tool IDs by usefulness for this selection and context.`;
+\nDetected types (legacy signal, may be empty): ${types}. Rank up to 4 tool IDs by usefulness for this selection and context.`;
 }
 
 function safeParseJSON(text) {
