@@ -865,8 +865,8 @@ function injectUI() {
     // Start with small size - will be resized when UI shows
     frame.style.left = '0';
     frame.style.top = '0';
-    frame.style.width = '362px';  // Slightly wider for content
-    frame.style.height = '600px'; // Taller to prevent cutoff
+    frame.style.width = '364px';  // Slightly wider for content
+    frame.style.height = '700px'; // Taller to prevent cutoff
     frame.style.border = '0';
     frame.style.background = 'transparent';
     frame.style.zIndex = '2147483646';

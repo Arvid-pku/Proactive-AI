@@ -149,25 +149,6 @@ function ProactiveAI() {
             )}
           </div>
 
-          {(metadata?.detectorSummary?.length || metadata?.language) && (
-            <div className="proactive-ai-context">
-              {metadata?.detectorSummary?.length ? (
-                <div className="proactive-ai-context-section">
-                  <div className="proactive-ai-context-title">Why these tools</div>
-                  <ul className="proactive-ai-context-list">
-                    {metadata.detectorSummary.map((hint, index) => (
-                      <li key={`${hint}-${index}`}>{hint}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {metadata?.language && metadata.language !== 'unknown' && (
-                <div className="proactive-ai-context-meta">
-                  Detected language: <strong>{metadata.language}</strong>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="proactive-ai-tools">
             {tools.map(toolId => {
