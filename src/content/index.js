@@ -14,6 +14,7 @@ let uiInjected = false;
 let uiReady = false;
 let uiFrame = null;
 const uiMessageQueue = [];
+let currentUIPosition = { x: 0, y: 0 };
 let currentOCRBadge = null;
 let currentContentTypes = [];
 let currentMetadata = null;
@@ -87,8 +88,46 @@ window.addEventListener('message', (event) => {
           }
         } catch (_) {}
       }
+    } else if (
+      event.data &&
+      event.data.type === 'PROACTIVE_AI_DRAG_DELTA' &&
+      event.source === (uiFrame?.contentWindow || null)
+    ) {
+      const deltaX = Number(event.data.payload?.deltaX || 0);
+      const deltaY = Number(event.data.payload?.deltaY || 0);
+      if (!uiFrame || (!deltaX && !deltaY)) {
+        return;
+      }
+
+      const nextPosition = clampUIPosition(currentUIPosition.x + deltaX, currentUIPosition.y + deltaY);
+      currentUIPosition = nextPosition;
+
+      uiFrame.style.left = `${nextPosition.x}px`;
+      uiFrame.style.top = `${nextPosition.y}px`;
     }
   } catch (_) {}
+});
+
+function clampUIPosition(x, y) {
+  const padding = 8;
+  const frameWidth = uiFrame ? parseFloat(uiFrame.style.width) || uiFrame.offsetWidth || 362 : 362;
+  const frameHeight = uiFrame ? parseFloat(uiFrame.style.height) || uiFrame.offsetHeight || 600 : 600;
+  const maxX = Math.max(padding, window.innerWidth - frameWidth - padding);
+  const maxY = Math.max(padding, window.innerHeight - frameHeight - padding);
+  return {
+    x: Math.min(Math.max(padding, x), maxX),
+    y: Math.min(Math.max(padding, y), maxY)
+  };
+}
+
+window.addEventListener('resize', () => {
+  if (!uiFrame) {
+    return;
+  }
+  const nextPosition = clampUIPosition(currentUIPosition.x, currentUIPosition.y);
+  currentUIPosition = nextPosition;
+  uiFrame.style.left = `${nextPosition.x}px`;
+  uiFrame.style.top = `${nextPosition.y}px`;
 });
 
 /**
@@ -734,13 +773,16 @@ function showUI({
     currentMetadata = metadata;
   }
 
+  const clampedPosition = clampUIPosition(position.x, position.y);
+  currentUIPosition = clampedPosition;
+
   const message = {
     type: 'PROACTIVE_AI_SHOW',
     payload: {
       tools,
       content: content.slice(0, 200), // Preview only
       fullContent: content,
-      position,
+      position: clampedPosition,
       contentTypes,
       trigger,
       loading,
@@ -759,8 +801,8 @@ function showUI({
   try {
     if (uiFrame && uiFrame.contentWindow) {
       // Position and show the iframe at the UI position
-      uiFrame.style.left = position.x + 'px';
-      uiFrame.style.top = position.y + 'px';
+  uiFrame.style.left = clampedPosition.x + 'px';
+  uiFrame.style.top = clampedPosition.y + 'px';
       uiFrame.style.display = 'block';
       console.log('✅ Iframe positioned and visible at', position);
       console.log('✅ Sending message to UI iframe');
