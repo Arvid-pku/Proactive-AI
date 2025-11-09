@@ -26,6 +26,7 @@
   color: var(--text-color);
   overflow: hidden;
   animation: proactive-slide-in 160ms ease-out;
+  pointer-events: auto !important; /* CRITICAL: Enable clicks on the UI container */
 }
 
 @keyframes proactive-slide-in {

@@ -7,13 +7,14 @@
   width: 100vw;
   height: 100vh;
   z-index: 2147483646;
-  pointer-events: none; /* enabled dynamically when showing UI */
+  pointer-events: none; /* Container itself is always none */
   display: block;
 }
 
-#proactive-ai-root * {
-  pointer-events: auto;
-}
+/* Iframe pointer-events toggled dynamically via JS:
+   - auto when UI is visible (so buttons work)
+   - none when UI is hidden (so page is clickable)
+*/
 
 /* Highlight selection effect (optional) */
 .proactive-ai-highlight {

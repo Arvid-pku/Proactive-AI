@@ -80,7 +80,7 @@ window.addEventListener('message', (event) => {
         console.log('Flushing queued message:', msg.type);
         try {
           if (uiFrame && uiFrame.contentWindow) {
-            uiFrame.style.pointerEvents = 'auto';
+            // Don't set pointer-events on iframe - keep it transparent
             uiFrame.contentWindow.postMessage(msg, '*');
           } else {
             window.postMessage(msg, '*');
@@ -502,13 +502,21 @@ async function runPendingAnalysis(target = pendingAnalysis) {
 }
 
 function handleDocumentClick(event) {
+  // Check if clicking on trigger button
   if (analysisTriggerButton && analysisTriggerButton.contains(event.target)) {
     return;
   }
+  
+  // Check if clicking on OCR badge
   if (currentOCRBadge && currentOCRBadge.contains(event.target)) {
     return;
   }
+  
+  // Check if clicking inside UI
+  // When iframe has pointer-events: auto, clicks inside it won't bubble to document
+  // So if we're here and iframe is visible with auto, click is outside UI
   if (event.target.closest && event.target.closest('#proactive-ai-root')) {
+    console.log('Click target is inside proactive-ai-root');
     return;
   }
   
@@ -517,6 +525,7 @@ function handleDocumentClick(event) {
     return;
   }
   
+  // If clicking on an image, show OCR badge
   if (isImage(event.target)) {
     event.preventDefault();
     event.stopPropagation();
@@ -536,10 +545,13 @@ function handleDocumentClick(event) {
     return;
   }
   
+  // Clicked outside - remove trigger and hide UI
+  console.log('Click outside UI/trigger, hiding');
   if (analysisTriggerButton) {
     removeAnalysisTrigger();
     pendingAnalysis = null;
   }
+  hideUI();
 }
 
 const FALLBACK_TOOLS = {
@@ -745,13 +757,12 @@ function showUI({
   }
   // Also attempt to post immediately in case UI is already ready
   try {
-    const containerEl = document.getElementById('proactive-ai-root');
-    if (containerEl) {
-      containerEl.style.pointerEvents = 'auto';
-    }
     if (uiFrame && uiFrame.contentWindow) {
-      // Enable interactions while UI is visible
-      uiFrame.style.pointerEvents = 'auto';
+      // Position and show the iframe at the UI position
+      uiFrame.style.left = position.x + 'px';
+      uiFrame.style.top = position.y + 'px';
+      uiFrame.style.display = 'block';
+      console.log('✅ Iframe positioned and visible at', position);
       console.log('✅ Sending message to UI iframe');
       uiFrame.contentWindow.postMessage(message, '*');
     } else {
@@ -770,21 +781,22 @@ function showUI({
  * Hide UI
  */
 function hideUI() {
+  console.log('🙈 Hiding UI');
   const msg = { type: 'PROACTIVE_AI_HIDE' };
   try {
     if (uiFrame && uiFrame.contentWindow) {
       uiFrame.contentWindow.postMessage(msg, '*');
-      // Disable interactions when hidden so page remains usable
-      uiFrame.style.pointerEvents = 'none';
+      // Hide the iframe completely
+      uiFrame.style.display = 'none';
+      console.log('Iframe hidden (page fully clickable)');
     } else {
       window.postMessage(msg, '*');
     }
-    const containerEl = document.getElementById('proactive-ai-root');
-    if (containerEl) {
-      containerEl.style.pointerEvents = 'none';
-    }
   } catch (_) {}
-  removeAnalysisTrigger();
+  
+  // Don't remove the trigger button when hiding UI!
+  // User should be able to click it again to re-open
+  console.log('UI hidden, trigger button remains for re-use');
 }
 
 function buildSelectionMetadata({ text, element, analysis, trigger, context, isOCR, ocrConfidence }) {
@@ -850,15 +862,16 @@ function injectUI() {
     frame.id = 'proactive-ai-frame';
     frame.src = chrome.runtime.getURL('ui.html');
     frame.style.position = 'fixed';
+    // Start with small size - will be resized when UI shows
     frame.style.left = '0';
     frame.style.top = '0';
-    frame.style.width = '100%';
-    frame.style.height = '100%';
+    frame.style.width = '400px';
+    frame.style.height = '600px';
     frame.style.border = '0';
     frame.style.background = 'transparent';
     frame.style.zIndex = '2147483646';
-    // Start non-interactive; enable on show
-    frame.style.pointerEvents = 'none';
+    frame.style.pointerEvents = 'auto'; // Always auto - but only blocks the small UI area!
+    frame.style.display = 'none'; // Start hidden
     container.appendChild(frame);
     uiFrame = frame;
     
