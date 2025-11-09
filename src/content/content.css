@@ -24,37 +24,277 @@
   transition: all 0.2s ease;
 }
 
-/* Floating action button */
+/* Floating action button - Desktop Pet */
 #proactive-ai-fab {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(68, 54, 42, 0.12);
-  box-shadow: 0 24px 48px rgba(68, 54, 42, 0.22);
+  width: 80px;
+  height: 80px;
   cursor: pointer;
   z-index: 2147483645;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-  color: #b68355;
-  backdrop-filter: blur(18px);
+  transition: transform 0.3s ease;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
-#proactive-ai-fab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 32px 54px rgba(182, 131, 85, 0.28);
-  border-color: rgba(182, 131, 85, 0.38);
+/* Hover effect - controlled by JavaScript to avoid conflicts */
+#proactive-ai-fab.pet-hovering {
+  transform: scale(1.1) translateY(-4px) !important;
 }
 
 #proactive-ai-fab:active {
-  transform: translateY(0);
-  box-shadow: 0 20px 40px rgba(182, 131, 85, 0.22);
+  transform: scale(0.95) !important;
+}
+
+/* Speech bubble for pet - positioned at top-left diagonal */
+.proactive-ai-pet-bubble {
+  position: absolute;
+  right: 80%;
+  bottom: 90%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #2f281f;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(68, 54, 42, 0.15);
+  border: 1px solid rgba(182, 131, 85, 0.2);
+  pointer-events: none;
+  z-index: 1;
+  transform-origin: bottom right;
+  animation: proactive-bubble-in 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Lightning tail pointing to pet - zigzag style */
+.proactive-ai-pet-bubble::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 100%;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 12px 8px 0 8px;
+  border-color: rgba(255, 255, 255, 0.95) transparent transparent transparent;
+  filter: drop-shadow(0 2px 3px rgba(68, 54, 42, 0.1));
+}
+
+/* Lightning bolt detail - adds a zigzag effect */
+.proactive-ai-pet-bubble::before {
+  content: '';
+  position: absolute;
+  right: 14px;
+  top: 100%;
+  width: 2px;
+  height: 20px;
+  background: linear-gradient(to bottom, 
+    rgba(255, 255, 255, 0.95) 0%, 
+    rgba(255, 255, 255, 0.8) 50%,
+    transparent 100%);
+  clip-path: polygon(
+    0% 0%, 100% 0%,
+    60% 40%, 100% 40%,
+    40% 70%, 80% 70%,
+    30% 100%, 30% 70%,
+    0% 70%, 40% 40%,
+    0% 40%
+  );
+}
+
+@keyframes proactive-bubble-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  85% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Website Summary Bubble - positioned independently near the pet */
+.proactive-ai-summary-bubble {
+  position: fixed;
+  /* Position will be set dynamically by JavaScript */
+  width: 260px;
+  max-width: 85vw;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(68, 54, 42, 0.2);
+  border: 1px solid rgba(182, 131, 85, 0.3);
+  overflow: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 2147483644; /* Just below fab */
+  pointer-events: auto; /* Allow clicking inside the bubble */
+}
+
+/* Lightning tail pointing to pet - bottom-right */
+.proactive-ai-summary-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 24px;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 10px solid rgba(255, 255, 255, 0.98);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f4dac0 0%, #e8c9a8 100%);
+  border-bottom: 1px solid rgba(182, 131, 85, 0.2);
+}
+
+.summary-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f281f;
+}
+
+.summary-close {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #2f281f;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.summary-close:hover {
+  background: rgba(68, 54, 42, 0.1);
+}
+
+.summary-body {
+  padding: 16px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.summary-loading {
+  color: #666;
+  font-size: 13px;
+  font-style: italic;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.summary-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2f281f;
+  word-wrap: break-word;
+}
+
+/* LaTeX and Markdown support in summary */
+.summary-text code {
+  background: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #c7254e;
+}
+
+.summary-text strong {
+  font-weight: 600;
+  color: #1a1410;
+}
+
+.summary-text em {
+  font-style: italic;
+}
+
+.summary-text h1 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 8px 0 4px 0;
+  color: #1a1410;
+}
+
+.summary-text h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 6px 0 3px 0;
+  color: #1a1410;
+}
+
+.summary-text h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 4px 0 2px 0;
+  color: #2f281f;
+}
+
+/* Math rendering styles (Unicode-based) */
+.summary-text .math-display {
+  display: block;
+  margin: 10px 0;
+  padding: 8px 12px;
+  background: #f9f9f9;
+  border-left: 3px solid #b68355;
+  border-radius: 4px;
+  font-family: 'Cambria Math', 'Times New Roman', serif;
+  font-size: 14px;
+  overflow-x: auto;
+  text-align: center;
+  color: #1a1410;
+}
+
+.summary-text .math-inline {
+  font-family: 'Cambria Math', 'Times New Roman', serif;
+  font-size: 13px;
+  color: #2f281f;
+  padding: 0 2px;
+}
+
+/* Scrollbar styling for summary */
+.summary-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.summary-body::-webkit-scrollbar-track {
+  background: rgba(182, 131, 85, 0.1);
+  border-radius: 3px;
+}
+
+.summary-body::-webkit-scrollbar-thumb {
+  background: rgba(182, 131, 85, 0.3);
+  border-radius: 3px;
+}
+
+.summary-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(182, 131, 85, 0.5);
 }
 
 /* AI Trigger Point */

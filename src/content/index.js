@@ -468,6 +468,8 @@ function updateImageBadgeState(element, state) {
       currentOCRBadge.textContent = ''; // Keep empty during processing
       currentOCRBadge.disabled = true;
     }
+    // Update pet animation - working
+    updatePetForBadgeState('processing');
   } else if (state === 'success') {
     element.classList.add('proactive-ai-ocr-success');
     if (currentOCRBadge && currentOCRBadgeTarget === element) {
@@ -475,6 +477,8 @@ function updateImageBadgeState(element, state) {
       currentOCRBadge.textContent = ''; // Keep empty on success
       currentOCRBadge.disabled = false; // Re-enable so it can be clicked again
     }
+    // Update pet animation - celebrating
+    updatePetForBadgeState('success');
     // Keep the success state - don't auto-remove it
     // It will be removed when user clicks outside (removeImageBadge)
   } else {
@@ -498,6 +502,9 @@ function removeImageBadge() {
     currentOCRBadge = null;
     currentOCRBadgeHandler = null;
     currentOCRBadgeTarget = null;
+    
+    // Reset pet to waiting state when OCR badge is removed
+    updatePetForBadgeState('none');
   }
   
   // Remove all OCR-related classes from all elements
@@ -573,6 +580,9 @@ function removeAnalysisTrigger() {
     analysisTriggerButton.remove();
     analysisTriggerButton = null;
     analysisTriggerHandler = null;
+    
+    // Reset pet to waiting state when badge is removed
+    updatePetForBadgeState('none');
   }
 }
 
@@ -586,8 +596,46 @@ function updateAnalysisTriggerState(state) {
   
   if (state === 'processing') {
     analysisTriggerButton.classList.add('is-processing');
+    updatePetForBadgeState('processing');
   } else if (state === 'success') {
     analysisTriggerButton.classList.add('is-success');
+    updatePetForBadgeState('success');
+  }
+}
+
+/**
+ * Update pet animation based on badge state
+ */
+function updatePetForBadgeState(state) {
+  // Get reference to pet elements
+  const fab = document.getElementById('proactive-ai-fab');
+  if (!fab) return;
+  
+  const petImg = fab.querySelector('img');
+  if (!petImg) return;
+  
+  // Get current pet animation state from the closure
+  // We'll access these through a global object
+  if (!window.__petState) return;
+  
+  const { petAnimationState, setPetImg, clearIdleAction } = window.__petState;
+  
+  // Don't interrupt user interaction (hovering)
+  if (petAnimationState === 'touching' || petAnimationState === 'touched') {
+    return;
+  }
+  
+  if (state === 'processing') {
+    // Blue badge - pet is busy working
+    clearIdleAction();
+    setPetImg('busy');
+  } else if (state === 'success') {
+    // Green badge - pet is yelling (excited about success)
+    clearIdleAction();
+    setPetImg('yelling');
+  } else {
+    // No badge or badge removed - return to waiting
+    setPetImg('waitting');
   }
 }
 
@@ -1088,11 +1136,102 @@ function injectUI() {
     document.head.appendChild(script);
   }
   
-  // Create floating action button (FAB)
-  const fab = document.createElement('button');
+  // Create floating action button (FAB) - Desktop Pet
+  const fab = document.createElement('div');
   fab.id = 'proactive-ai-fab';
-  fab.innerHTML = 'AI';
-  fab.title = 'Open AI Assistant Panel';
+  
+  // Create image element for the pet GIF
+  const petImg = document.createElement('img');
+  petImg.src = chrome.runtime.getURL('src/imgs/waitting.gif');
+  petImg.alt = 'AI Pet';
+  petImg.style.width = '100%';
+  petImg.style.height = '100%';
+  petImg.style.objectFit = 'contain';
+  petImg.style.pointerEvents = 'auto'; // Need to receive hover events
+  petImg.style.cursor = 'pointer';
+  fab.appendChild(petImg);
+  
+  // Create speech bubble tooltip
+  const speechBubble = document.createElement('div');
+  speechBubble.className = 'proactive-ai-pet-bubble';
+  speechBubble.textContent = 'Click me to open Assistant Panel!';
+  speechBubble.style.display = 'none'; // Hidden by default
+  fab.appendChild(speechBubble);
+  
+  // Pet animation state
+  let petAnimationState = 'waiting'; // 'waiting', 'touching', 'touched'
+  let petTransitionTimeout = null;
+  
+  // Hover on FAB (includes pet image and speech bubble)
+  fab.addEventListener('mouseenter', () => {
+    // Show speech bubble
+    speechBubble.style.display = 'block';
+    
+    // Add hover class for scaling effect
+    fab.classList.add('pet-hovering');
+    
+    // Completely hide summary bubble when hovering pet
+    if (summaryBubble) {
+      summaryBubble.style.opacity = '0';
+      summaryBubble.style.visibility = 'hidden';
+      summaryBubble.style.pointerEvents = 'none';
+    }
+    
+    if (petAnimationState === 'waiting') {
+      petAnimationState = 'touching';
+      
+      // Clear any existing timeout
+      if (petTransitionTimeout) {
+        clearTimeout(petTransitionTimeout);
+        petTransitionTimeout = null;
+      }
+      
+      // Play be_touched.gif once
+      petImg.src = chrome.runtime.getURL('src/imgs/be_touched.gif');
+      
+      // After be_touched finishes, switch to ontouch loop
+      petTransitionTimeout = setTimeout(() => {
+        petAnimationState = 'touched';
+        petImg.src = chrome.runtime.getURL('src/imgs/ontouch.gif');
+        petTransitionTimeout = null;
+      }, 500);
+    }
+  });
+  
+  // Mouse leave FAB
+  fab.addEventListener('mouseleave', () => {
+    // Hide speech bubble
+    speechBubble.style.display = 'none';
+    
+    // Remove hover class
+    fab.classList.remove('pet-hovering');
+    
+    // Restore summary bubble visibility when leaving pet
+    if (summaryBubble) {
+      summaryBubble.style.opacity = '1';
+      summaryBubble.style.visibility = 'visible';
+      summaryBubble.style.pointerEvents = 'auto';
+    }
+    
+    if (petAnimationState === 'touched' || petAnimationState === 'touching') {
+      // Clear any existing timeout
+      if (petTransitionTimeout) {
+        clearTimeout(petTransitionTimeout);
+        petTransitionTimeout = null;
+      }
+      
+      // Play back_to_waitting.gif once
+      petImg.src = chrome.runtime.getURL('src/imgs/back_to_waitting.gif');
+      
+      // After back_to_waitting finishes, switch to waitting loop
+      petTransitionTimeout = setTimeout(() => {
+        petAnimationState = 'waiting';
+        petImg.src = chrome.runtime.getURL('src/imgs/waitting.gif');
+        petTransitionTimeout = null;
+      }, 500);
+    }
+  });
+  
   fab.addEventListener('click', async () => {
     console.log('FAB clicked, opening side panel...');
     try {
@@ -1105,6 +1244,30 @@ function injectUI() {
     }
   });
   document.body.appendChild(fab);
+  
+  // Expose pet control functions globally for badge state updates
+  window.__petState = {
+    get petAnimationState() { return petAnimationState; },
+    setPetImg: (gifName) => {
+      // Don't interrupt user interaction
+      if (petAnimationState === 'touching' || petAnimationState === 'touched') {
+        return;
+      }
+      
+      petImg.src = chrome.runtime.getURL(`src/imgs/${gifName}.gif`);
+      
+      // Update state based on animation
+      if (gifName === 'waitting') {
+        petAnimationState = 'waiting';
+      } else {
+        // Mark as working or celebrating (not waiting)
+        petAnimationState = 'working';
+      }
+    },
+    clearIdleAction: () => {
+      // No idle actions to clear anymore
+    }
+  };
   
   uiInjected = true;
 }
@@ -1278,6 +1441,14 @@ document.addEventListener('mouseover', (event) => {
     return;
   }
   
+  // Don't trigger on FAB (pet) or summary bubble
+  if (event.target.closest && (
+      event.target.closest('#proactive-ai-fab') ||
+      event.target.closest('.proactive-ai-summary-bubble')
+  )) {
+    return;
+  }
+  
   // Don't trigger on trigger button or OCR badge
   if (event.target === analysisTriggerButton || 
       event.target === currentOCRBadge ||
@@ -1367,6 +1538,399 @@ document.addEventListener('mouseout', (event) => {
   }
 }, true);
 
+/**
+ * ========================================
+ * WEBSITE SUMMARY FEATURE (Independent Module)
+ * ========================================
+ */
+
+// State for website summary
+let summaryBubble = null;
+let summaryContent = null;
+let summaryLoading = false;
+let katexLoaded = false;
+
+/**
+ * Load KaTeX library dynamically
+ * NOTE: Due to CSP restrictions in content scripts, we cannot load external scripts.
+ * Instead, we'll use a simpler approach with basic LaTeX symbol replacement.
+ */
+function loadKaTeX() {
+  // Mark as loaded immediately - we're not actually loading KaTeX
+  katexLoaded = true;
+  return Promise.resolve();
+}
+
+/**
+ * Create and show website summary bubble
+ */
+async function showWebsiteSummary() {
+  // Don't show if already exists
+  if (summaryBubble) return;
+  
+  const fab = document.getElementById('proactive-ai-fab');
+  if (!fab) {
+    console.warn('FAB not found, cannot show summary');
+    return;
+  }
+  
+  // Create summary bubble as independent element (not child of fab)
+  const bubble = document.createElement('div');
+  bubble.className = 'proactive-ai-summary-bubble';
+  bubble.innerHTML = `
+    <div class="summary-header">
+      <span class="summary-title">📄 Page Summary</span>
+      <button class="summary-close" aria-label="Close summary">×</button>
+    </div>
+    <div class="summary-body">
+      <div class="summary-loading">Generating summary...</div>
+    </div>
+  `;
+  
+  // Position independently using fixed positioning
+  bubble.style.opacity = '0';
+  document.body.appendChild(bubble);
+  summaryBubble = bubble;
+  
+  // Calculate position relative to pet
+  const fabRect = fab.getBoundingClientRect();
+  bubble.style.position = 'fixed';
+  bubble.style.bottom = `${window.innerHeight - fabRect.top + 16}px`;
+  bubble.style.right = `${window.innerWidth - fabRect.right}px`;
+  
+  // Fade in animation
+  setTimeout(() => {
+    bubble.style.opacity = '1';
+  }, 100);
+  
+  // Close button handler - completely independent
+  const closeBtn = bubble.querySelector('.summary-close');
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    closeSummaryBubble();
+  });
+  
+  // Summary bubble hover events - completely independent from pet
+  bubble.addEventListener('mouseenter', () => {
+    // Just keep summary visible and interactive
+    bubble.style.opacity = '1';
+    bubble.style.visibility = 'visible';
+    bubble.style.pointerEvents = 'auto';
+  });
+  
+  bubble.addEventListener('mouseleave', () => {
+    // Keep summary visible when mouse leaves (unless manually closed)
+    bubble.style.opacity = '1';
+    bubble.style.visibility = 'visible';
+  });
+  
+  // Fetch summary from AI
+  await generateWebsiteSummary();
+}
+
+/**
+ * Generate website summary using AI
+ */
+async function generateWebsiteSummary() {
+  if (summaryLoading) return;
+  summaryLoading = true;
+  
+  try {
+    // Extract page content
+    const pageTitle = document.title || '';
+    const pageUrl = window.location.href;
+    
+    // Get main text content (limit to first 2000 chars for performance)
+    let pageText = '';
+    const bodyText = document.body.innerText || document.body.textContent || '';
+    pageText = bodyText.slice(0, 2000).trim();
+    
+    // Get meta description if available
+    const metaDesc = document.querySelector('meta[name="description"]')?.content || '';
+    
+    // Prepare request with enhanced prompt for structured summary
+    const summaryRequest = {
+      pageTitle,
+      pageUrl,
+      pageText,
+      metaDescription: metaDesc,
+      prompt: `Please provide a well-structured summary of this webpage using the following format:
+
+**Main Topic:** [One sentence describing the primary subject]
+
+**Key Points:**
+• [First key point or concept]
+• [Second key point or concept]
+• [Third key point if applicable]
+
+**Summary:** [2-3 sentence overview of the content]
+
+Guidelines:
+- Use **bold** for emphasis on important terms
+- Use *italic* for secondary emphasis
+- Use LaTeX notation for math: $ for inline (e.g., $x^2$) or $$ for display (e.g., $$\\int_0^1 x dx$$)
+- Use \`code\` for technical terms or code snippets
+- Keep it concise and informative
+- Focus on the most valuable information for quick understanding`
+    };
+    
+    console.log('Requesting website summary...');
+    
+    // Call background script to get AI summary
+    const response = await chrome.runtime.sendMessage({
+      action: 'GENERATE_PAGE_SUMMARY',
+      data: summaryRequest
+    });
+    
+    console.log('Summary response:', response);
+    
+    if (response && response.success && response.summary) {
+      displaySummary(response.summary);
+    } else {
+      displaySummary('Unable to generate summary. Please try again later.');
+    }
+  } catch (error) {
+    console.error('Error generating summary:', error);
+    displaySummary('Error generating summary. Please try again later.');
+  } finally {
+    summaryLoading = false;
+  }
+}
+
+/**
+ * Display summary content in bubble with LaTeX and Markdown support
+ */
+async function displaySummary(text) {
+  if (!summaryBubble) return;
+  
+  const bodyEl = summaryBubble.querySelector('.summary-body');
+  if (!bodyEl) return;
+  
+  // Process Markdown and convert LaTeX to readable format
+  const processedText = renderMarkdownAndLatex(text);
+  bodyEl.innerHTML = `<div class="summary-text">${processedText}</div>`;
+  
+  // Note: Due to CSP restrictions, we cannot load external KaTeX library
+  // The LaTeX will be displayed with basic Unicode math symbols
+}
+
+/**
+ * Simple Markdown and LaTeX renderer
+ * Converts LaTeX to Unicode math symbols for display without external libraries
+ */
+function renderMarkdownAndLatex(text) {
+  let processed = text;
+  
+  // First, protect LaTeX expressions from HTML escaping and Markdown processing
+  const latexExpressions = [];
+  
+  // Extract display math $$...$$ (non-greedy, multiline)
+  processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (match, content) => {
+    const index = latexExpressions.length;
+    latexExpressions.push({type: 'display', content: content.trim()});
+    return `___LATEX_DISPLAY_${index}___`;
+  });
+  
+  // Extract display math \[...\] (non-greedy, multiline)
+  processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (match, content) => {
+    const index = latexExpressions.length;
+    latexExpressions.push({type: 'display', content: content.trim()});
+    return `___LATEX_DISPLAY_${index}___`;
+  });
+  
+  // Extract inline math $...$ (non-greedy, single line)
+  processed = processed.replace(/\$([^\$\n]+?)\$/g, (match, content) => {
+    const index = latexExpressions.length;
+    latexExpressions.push({type: 'inline', content: content.trim()});
+    return `___LATEX_INLINE_${index}___`;
+  });
+  
+  // Extract inline math \(...\) (non-greedy)
+  processed = processed.replace(/\\\((.*?)\\\)/g, (match, content) => {
+    const index = latexExpressions.length;
+    latexExpressions.push({type: 'inline', content: content.trim()});
+    return `___LATEX_INLINE_${index}___`;
+  });
+  
+  // Now escape dangerous HTML (but preserve placeholders)
+  processed = processed.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  // Process Markdown
+  // Bold **text**
+  processed = processed.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  
+  // Italic *text* (single asterisk not part of **)
+  processed = processed.replace(/(?<!\*)\*([^*\s][^*]*?)\*(?!\*)/g, '<em>$1</em>');
+  
+  // Inline code `code`
+  processed = processed.replace(/`([^`]+?)`/g, '<code>$1</code>');
+  
+  // Headers with line breaks after them
+  processed = processed.replace(/^### (.+)$/gm, '<h3>$1</h3><br>');
+  processed = processed.replace(/^## (.+)$/gm, '<h2>$1</h2><br>');
+  processed = processed.replace(/^# (.+)$/gm, '<h1>$1</h1><br>');
+  
+  // Line breaks for remaining newlines
+  processed = processed.replace(/\n/g, '<br>');
+  
+  // Restore LaTeX expressions with Unicode conversion
+  processed = processed.replace(/___LATEX_DISPLAY_(\d+)___/g, (match, index) => {
+    const latex = latexExpressions[parseInt(index)];
+    const converted = convertLatexToUnicode(latex.content);
+    return `<div class="math-display">${converted}</div>`;
+  });
+  
+  processed = processed.replace(/___LATEX_INLINE_(\d+)___/g, (match, index) => {
+    const latex = latexExpressions[parseInt(index)];
+    const converted = convertLatexToUnicode(latex.content);
+    return `<span class="math-inline">${converted}</span>`;
+  });
+  
+  return processed;
+}
+
+/**
+ * Convert common LaTeX symbols to Unicode
+ */
+function convertLatexToUnicode(latex) {
+  let result = latex;
+  
+  // Common Greek letters
+  const greekMap = {
+    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ',
+    '\\epsilon': 'ε', '\\zeta': 'ζ', '\\eta': 'η', '\\theta': 'θ',
+    '\\iota': 'ι', '\\kappa': 'κ', '\\lambda': 'λ', '\\mu': 'μ',
+    '\\nu': 'ν', '\\xi': 'ξ', '\\pi': 'π', '\\rho': 'ρ',
+    '\\sigma': 'σ', '\\tau': 'τ', '\\phi': 'φ', '\\chi': 'χ',
+    '\\psi': 'ψ', '\\omega': 'ω',
+    '\\Gamma': 'Γ', '\\Delta': 'Δ', '\\Theta': 'Θ', '\\Lambda': 'Λ',
+    '\\Xi': 'Ξ', '\\Pi': 'Π', '\\Sigma': 'Σ', '\\Phi': 'Φ',
+    '\\Psi': 'Ψ', '\\Omega': 'Ω'
+  };
+  
+  // Math operators and symbols
+  const symbolMap = {
+    '\\infty': '∞', '\\partial': '∂', '\\nabla': '∇',
+    '\\sum': '∑', '\\prod': '∏', '\\int': '∫',
+    '\\pm': '±', '\\mp': '∓', '\\times': '×', '\\div': '÷',
+    '\\cdot': '·', '\\neq': '≠', '\\leq': '≤', '\\geq': '≥',
+    '\\approx': '≈', '\\equiv': '≡', '\\sim': '∼',
+    '\\propto': '∝', '\\in': '∈', '\\notin': '∉',
+    '\\subset': '⊂', '\\supset': '⊃', '\\subseteq': '⊆', '\\supseteq': '⊇',
+    '\\cup': '∪', '\\cap': '∩', '\\emptyset': '∅',
+    '\\forall': '∀', '\\exists': '∃', '\\nexists': '∄',
+    '\\rightarrow': '→', '\\leftarrow': '←', '\\leftrightarrow': '↔',
+    '\\Rightarrow': '⇒', '\\Leftarrow': '⇐', '\\Leftrightarrow': '⇔',
+    '\\sqrt': '√', '\\angle': '∠', '\\perp': '⊥', '\\parallel': '∥'
+  };
+  
+  // Replace Greek letters
+  for (const [latex, unicode] of Object.entries(greekMap)) {
+    result = result.replace(new RegExp(latex.replace('\\', '\\\\'), 'g'), unicode);
+  }
+  
+  // Replace symbols
+  for (const [latex, unicode] of Object.entries(symbolMap)) {
+    result = result.replace(new RegExp(latex.replace('\\', '\\\\'), 'g'), unicode);
+  }
+  
+  // Handle fractions \frac{a}{b} -> a/b
+  result = result.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
+  
+  // Handle superscripts ^{} or ^x
+  result = result.replace(/\^{([^}]+)}/g, (match, p1) => {
+    return toSuperscript(p1);
+  });
+  result = result.replace(/\^([a-zA-Z0-9])/g, (match, p1) => {
+    return toSuperscript(p1);
+  });
+  
+  // Handle subscripts _{} or _x
+  result = result.replace(/_{([^}]+)}/g, (match, p1) => {
+    return toSubscript(p1);
+  });
+  result = result.replace(/_([a-zA-Z0-9])/g, (match, p1) => {
+    return toSubscript(p1);
+  });
+  
+  // Clean up remaining LaTeX commands (just remove backslashes)
+  result = result.replace(/\\([a-zA-Z]+)/g, '$1');
+  
+  // Clean up extra braces
+  result = result.replace(/[{}]/g, '');
+  
+  return result;
+}
+
+/**
+ * Convert text to superscript Unicode
+ */
+function toSuperscript(text) {
+  const superscriptMap = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+    'a': 'ᵃ', 'b': 'ᵇ', 'c': 'ᶜ', 'd': 'ᵈ', 'e': 'ᵉ',
+    'f': 'ᶠ', 'g': 'ᵍ', 'h': 'ʰ', 'i': 'ⁱ', 'j': 'ʲ',
+    'k': 'ᵏ', 'l': 'ˡ', 'm': 'ᵐ', 'n': 'ⁿ', 'o': 'ᵒ',
+    'p': 'ᵖ', 'r': 'ʳ', 's': 'ˢ', 't': 'ᵗ', 'u': 'ᵘ',
+    'v': 'ᵛ', 'w': 'ʷ', 'x': 'ˣ', 'y': 'ʸ', 'z': 'ᶻ',
+    '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾'
+  };
+  
+  return text.split('').map(char => superscriptMap[char] || char).join('');
+}
+
+/**
+ * Convert text to subscript Unicode
+ */
+function toSubscript(text) {
+  const subscriptMap = {
+    '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄',
+    '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉',
+    'a': 'ₐ', 'e': 'ₑ', 'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ',
+    'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ',
+    'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ',
+    'v': 'ᵥ', 'x': 'ₓ',
+    '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎'
+  };
+  
+  return text.split('').map(char => subscriptMap[char] || char).join('');
+}
+
+/**
+ * Close and remove summary bubble
+ */
+function closeSummaryBubble() {
+  if (!summaryBubble) return;
+  
+  // Fade out
+  summaryBubble.style.opacity = '0';
+  
+  setTimeout(() => {
+    if (summaryBubble && summaryBubble.parentNode) {
+      summaryBubble.remove();
+    }
+    summaryBubble = null;
+    summaryContent = null;
+  }, 300);
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * ========================================
+ * END OF WEBSITE SUMMARY FEATURE
+ * ========================================
+ */
+
 console.log('Proactive AI Assistant content script loaded');
 
 // Ensure UI is injected on page load so FAB and iframe are available
@@ -1374,6 +1938,10 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     try {
       injectUI();
+      // Show website summary after a short delay
+      setTimeout(() => {
+        showWebsiteSummary();
+      }, 2000);
     } catch (e) {
       // ignore
     }
@@ -1381,6 +1949,10 @@ if (document.readyState === 'loading') {
 } else {
   try {
     injectUI();
+    // Show website summary after a short delay
+    setTimeout(() => {
+      showWebsiteSummary();
+    }, 2000);
   } catch (e) {
     // ignore
   }

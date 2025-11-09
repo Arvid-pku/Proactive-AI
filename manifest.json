@@ -29,7 +29,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["ui.html", "ui.js", "ui.css", "icons/icon48.png"],
+      "resources": [
+        "ui.html", 
+        "ui.js", 
+        "ui.css", 
+        "icons/icon48.png",
+        "src/imgs/*.gif"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
