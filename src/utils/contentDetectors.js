@@ -57,13 +57,25 @@ export function detectForeignLanguage(text) {
 
 // Detect chemical formulas
 export function detectChemical(text) {
-  const chemPatterns = [
-    /\b[A-Z][a-z]?\d*([A-Z][a-z]?\d*)+\b/,  // H2O, CO2, etc.
-    /\bCH\d+/,  // Organic chemistry
-    /\b(acid|base|molecule|compound|ion|pH)\b/i
-  ];
-  
-  return chemPatterns.some(pattern => pattern.test(text));
+  if (!text) return false;
+
+  // Obvious chemistry keywords
+  const keywordPattern = /\b(acid|base|molecule|compound|ion|pH)\b/i;
+  if (keywordPattern.test(text)) return true;
+
+  // Heuristic for formula-like tokens (e.g., H2O, NaCl, CH3CH2OH)
+  // Avoid matching all-caps acronyms like NICE/CPU by requiring at least one
+  // lowercase letter or digit, and at least two element-like chunks overall.
+  const tokens = text.split(/\s+/).slice(0, 100); // limit scan
+  for (const raw of tokens) {
+    const t = raw.replace(/[^A-Za-z0-9]/g, '');
+    if (!t || t.length < 2 || t.length > 24) continue;
+    if (/^[A-Z]{2,}$/.test(t)) continue; // pure acronym -> skip
+    if (!/[a-z0-9]/.test(t)) continue; // must contain lowercase or digit
+    if (/^(?:[A-Z][a-z]?\d*){2,}$/.test(t)) return true; // looks like a formula
+  }
+
+  return false;
 }
 
 // Detect dates and historical events
