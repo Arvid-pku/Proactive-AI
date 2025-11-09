@@ -23,7 +23,6 @@ let analysisTriggerButton = null;
 let analysisTriggerHandler = null;
 let pendingAnalysis = null;
 let suppressNextClickReset = false;
-let uiInitTimerId = null;
 
 // Configuration
 const MIN_TEXT_LENGTH = 3;
@@ -428,10 +427,21 @@ async function runPendingAnalysis(target = pendingAnalysis) {
   if (!target.promise) {
     target.promise = preparePendingAnalysis(target);
   }
-
-  // Always show a loading state immediately for responsiveness
-  showLoadingState(target);
-
+  
+  if (target.loading) {
+    showLoadingState(target);
+    try {
+      await target.promise;
+    } catch (error) {
+      console.error('Analysis preparation failed:', error);
+    }
+    if (pendingAnalysis !== target) {
+      return;
+    }
+    showPreparedAnalysis(target);
+    return;
+  }
+  
   try {
     await target.promise;
   } catch (error) {
@@ -690,9 +700,9 @@ function showUI({
       // Enable interactions while UI is visible
       uiFrame.style.pointerEvents = 'auto';
       uiFrame.contentWindow.postMessage(message, '*');
+    } else {
+      window.postMessage(message, '*');
     }
-    // Always broadcast to page as well to support non-iframe fallback
-    window.postMessage(message, '*');
   } catch (_) {}
   
   // Inject UI if not already injected
@@ -709,9 +719,9 @@ function hideUI() {
       uiFrame.contentWindow.postMessage(msg, '*');
       // Disable interactions when hidden so page remains usable
       uiFrame.style.pointerEvents = 'none';
+    } else {
+      window.postMessage(msg, '*');
     }
-    // Always broadcast to page as well to support non-iframe fallback
-    window.postMessage(msg, '*');
     const containerEl = document.getElementById('proactive-ai-root');
     if (containerEl) {
       containerEl.style.pointerEvents = 'none';
@@ -792,15 +802,6 @@ function injectUI() {
     frame.style.zIndex = '2147483646';
     // Start non-interactive; enable on show
     frame.style.pointerEvents = 'none';
-    frame.addEventListener('error', () => {
-      // Fallback to direct script injection if iframe fails
-      try {
-        frame.remove();
-      } catch (_) {}
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL('ui.js');
-      document.head.appendChild(script);
-    });
     container.appendChild(frame);
     uiFrame = frame;
   } catch (e) {
@@ -809,27 +810,6 @@ function injectUI() {
     script.src = chrome.runtime.getURL('ui.js');
     document.head.appendChild(script);
   }
-  
-  // If UI hasn't signaled readiness shortly after, attempt non-iframe fallback
-  if (uiInitTimerId) {
-    clearTimeout(uiInitTimerId);
-  }
-  uiInitTimerId = setTimeout(() => {
-    if (!uiReady) {
-      try {
-        if (uiFrame) {
-          uiFrame.remove();
-          uiFrame = null;
-        }
-        const existing = document.querySelector('script[src*="ui.js"]');
-        if (!existing) {
-          const script = document.createElement('script');
-          script.src = chrome.runtime.getURL('ui.js');
-          document.head.appendChild(script);
-        }
-      } catch (_) {}
-    }
-  }, 1500);
   
   // Create floating action button (FAB)
   const fab = document.createElement('button');
@@ -909,10 +889,11 @@ window.addEventListener('message', async (event) => {
         // Send result back to UI
         try {
           const msg = { type: 'PROACTIVE_AI_TOOL_RESULT', payload: response };
-      if (uiFrame && uiFrame.contentWindow) {
-        uiFrame.contentWindow.postMessage(msg, '*');
-      }
-      window.postMessage(msg, '*');
+          if (uiFrame && uiFrame.contentWindow) {
+            uiFrame.contentWindow.postMessage(msg, '*');
+          } else {
+            window.postMessage(msg, '*');
+          }
         } catch (_) {}
 
         return;
@@ -937,10 +918,11 @@ window.addEventListener('message', async (event) => {
       // Send result back to UI
       try {
         const msg = { type: 'PROACTIVE_AI_TOOL_RESULT', payload: response };
-      if (uiFrame && uiFrame.contentWindow) {
-        uiFrame.contentWindow.postMessage(msg, '*');
-      }
-      window.postMessage(msg, '*');
+        if (uiFrame && uiFrame.contentWindow) {
+          uiFrame.contentWindow.postMessage(msg, '*');
+        } else {
+          window.postMessage(msg, '*');
+        }
       } catch (_) {}
       
       // Handle specific result types
