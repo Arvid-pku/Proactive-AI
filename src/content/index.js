@@ -457,13 +457,14 @@ function removeImageBadge() {
 }
 
 function showAnalysisTrigger(position, { label = '', onActivate } = {}) {
-  // Don't recreate if button already exists at same position
+  // Don't recreate if button already exists
   if (analysisTriggerButton) {
     console.log('Trigger button already exists, skipping recreation');
     return;
   }
   
-  removeAnalysisTrigger();
+  // Don't remove existing trigger - the check above should prevent this
+  // removeAnalysisTrigger();
   
   const button = document.createElement('button');
   button.className = 'proactive-ai-trigger';
@@ -1213,6 +1214,19 @@ document.addEventListener('mouseover', (event) => {
     hoverTimeout = null;
   }
   
+  // Don't trigger on our own UI elements
+  if (event.target.closest && event.target.closest('#proactive-ai-root')) {
+    return;
+  }
+  
+  // Don't trigger on trigger button or OCR badge
+  if (event.target === analysisTriggerButton || 
+      event.target === currentOCRBadge ||
+      event.target.classList.contains('proactive-ai-trigger') ||
+      event.target.classList.contains('proactive-ai-ocr-badge')) {
+    return;
+  }
+  
   // Check if hovering over an image
   if (isImage(event.target)) {
     // Don't show badge if OCR is processing
@@ -1227,11 +1241,6 @@ document.addEventListener('mouseover', (event) => {
         clearTimeout(badgeRemovalTimeout);
         badgeRemovalTimeout = null;
       }
-      return;
-    }
-    
-    // Don't show badge on our own UI elements
-    if (event.target.closest && event.target.closest('#proactive-ai-root')) {
       return;
     }
     
