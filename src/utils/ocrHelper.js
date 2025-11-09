@@ -75,6 +75,13 @@ export async function performOCR(imageSource) {
 export function isImage(element) {
   if (!element) return false;
   
+  // Exclude our own UI elements
+  if (element.classList?.contains('proactive-ai-trigger') ||
+      element.classList?.contains('proactive-ai-ocr-badge') ||
+      element.id === 'proactive-ai-root') {
+    return false;
+  }
+  
   // Direct img tag
   if (element.tagName === 'IMG') return true;
   
