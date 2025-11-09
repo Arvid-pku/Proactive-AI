@@ -672,17 +672,30 @@ function handleDocumentClick(event) {
   hideUI();
 }
 
-const GENERIC_FALLBACK_TOOLS = ['save_note', 'summarize', 'explain_text'];
+const FALLBACK_TOOLS = {
+  math: ['graph_equation', 'explain_math'],
+  code: ['explain_code', 'debug_code'],
+  text: ['summarize', 'explain_text'],
+  foreign: ['translate', 'pronounce'],
+  chemical: ['visualize_chemical'],
+  table: ['export_table', 'visualize_data'],
+  citation: ['fetch_citation', 'summarize'],
+  url: ['check_link', 'summarize'],
+  image: ['ocr_image', 'summarize']
+};
 
-function computeFallbackTools() {
-  return GENERIC_FALLBACK_TOOLS.slice(0, 4);
+function computeFallbackTools(contentTypes = []) {
+  const tools = contentTypes
+    .flatMap(type => FALLBACK_TOOLS[type] || [])
+    .slice(0, 4);
+  return tools.length ? tools : ['save_note', 'summarize'];
 }
 
 function showLoadingState(target) {
   const loadingTools =
     (Array.isArray(target.tools) && target.tools.length > 0)
       ? target.tools
-      : computeFallbackTools();
+      : computeFallbackTools(target.contentTypes || []);
       
   showUI({
     tools: loadingTools,
@@ -701,7 +714,7 @@ function showPreparedAnalysis(target) {
   const preparedTools =
     (Array.isArray(target.tools) && target.tools.length > 0)
       ? target.tools
-      : computeFallbackTools();
+      : computeFallbackTools(target.contentTypes || []);
   
   showUI({
     tools: preparedTools,
@@ -800,26 +813,29 @@ async function preparePendingAnalysis(target) {
   console.log('  target.requestId:', target.requestId);
   console.log('  requestId:', requestId);
   
-  if (pendingAnalysis !== target || target.requestId !== requestId) {
-    console.warn('📊 preparePendingAnalysis: Target changed or request ID mismatch, aborting');
-    return;
-  }
+  // Don't check if target changed - always set the tools!
+  // The target object is passed by reference, so updating it is fine
+  console.log('📊 Setting tools on target (AI response received)');
   
   target.loading = false;
   
   if (response && response.success && Array.isArray(response.tools)) {
     target.tools = response.tools.slice(0, 4);
     target.response = response;
+    console.log('✅ AI suggested tools:', target.tools);
   } else if (response && Array.isArray(response.tools)) {
     target.tools = response.tools.slice(0, 4);
     target.response = response;
+    console.log('✅ Tools from response:', target.tools);
   } else {
-    target.tools = computeFallbackTools();
+    target.tools = computeFallbackTools(contentTypes);
     target.response = { success: false, fallback: true, tools: target.tools };
+    console.log('⚠️ No AI response, using fallback tools:', target.tools);
   }
   
   if (!target.tools || target.tools.length === 0) {
-    target.tools = computeFallbackTools();
+    target.tools = computeFallbackTools(contentTypes);
+    console.log('⚠️ Empty tools, using fallback:', target.tools);
   }
 
   return target;
@@ -927,7 +943,7 @@ function hideUI() {
 }
 
 function buildSelectionMetadata({ text, element, analysis, trigger, context, isOCR, ocrConfidence }) {
-  const language = detectLanguageHint(text);
+  const language = detectLanguageHint(text, analysis);
   const metadata = {
     pageTitle: document.title || '',
     language,
@@ -935,7 +951,7 @@ function buildSelectionMetadata({ text, element, analysis, trigger, context, isO
     trigger,
     sourceUrl: location.href,
     contentLength: text.length,
-    elementTag: analysis.elementTag || element?.tagName || '',
+    elementTag: element?.tagName || '',
     timestamp: Date.now(),
     contextSnippet: context.slice(-300)
   };
@@ -951,21 +967,17 @@ function buildSelectionMetadata({ text, element, analysis, trigger, context, isO
   if (elementLang) {
     metadata.elementLanguage = elementLang;
   }
-
-  if (analysis.elementSnapshot) {
-    metadata.elementSnapshot = analysis.elementSnapshot;
-  }
   
   return metadata;
 }
 
-function detectLanguageHint(text) {
+function detectLanguageHint(text, analysis) {
   const docLang = document.documentElement?.lang;
   const navigatorLang = navigator.language;
   let hint = docLang || navigatorLang || '';
   
-  if (containsNonLatin(text)) {
-    const nonLatinHint = 'non-Latin characters detected';
+  if (analysis.types.includes('foreign')) {
+    const nonLatinHint = containsNonLatin(text) ? 'non-Latin characters detected' : 'foreign language detected';
     hint = hint ? `${hint}; ${nonLatinHint}` : nonLatinHint;
   }
   
