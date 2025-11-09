@@ -130,6 +130,33 @@ function ProactiveAI() {
     }
   }, [isVisible, isDragging]);
 
+  // Listen for clicks outside the UI container
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleClickOutside = (event) => {
+      // Check if click is outside the UI container
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        console.log('Click outside UI container in iframe, notifying parent');
+        // Notify parent window (content script) to hide UI
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'PROACTIVE_AI_CLICK_OUTSIDE' }, '*');
+          }
+        } catch (e) {
+          console.error('Failed to notify parent about outside click:', e);
+        }
+      }
+    };
+
+    // Add listener to iframe's document
+    document.addEventListener('click', handleClickOutside, true);
+    
+    return () => {
+      document.removeEventListener('click', handleClickOutside, true);
+    };
+  }, [isVisible]);
+
   useEffect(() => {
     // Listen for messages from content script
     const handleMessage = (event) => {

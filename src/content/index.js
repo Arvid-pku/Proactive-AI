@@ -104,6 +104,25 @@ window.addEventListener('message', (event) => {
 
       uiFrame.style.left = `${nextPosition.x}px`;
       uiFrame.style.top = `${nextPosition.y}px`;
+    } else if (
+      event.data &&
+      event.data.type === 'PROACTIVE_AI_CLICK_OUTSIDE' &&
+      event.source === (uiFrame?.contentWindow || null)
+    ) {
+      // User clicked outside UI in iframe - hide everything
+      console.log('Click outside UI detected from iframe');
+      
+      // Don't hide if OCR is processing
+      if (pendingAnalysis && pendingAnalysis.isProcessing) {
+        console.log('⛔ OCR is processing, ignoring outside click');
+        return;
+      }
+      
+      // Clear state and hide UI
+      pendingAnalysis = null;
+      removeAnalysisTrigger();
+      removeImageBadge();
+      hideUI();
     }
   } catch (_) {}
 });
@@ -1018,7 +1037,7 @@ function injectUI() {
     frame.style.border = '0';
     frame.style.background = 'transparent';
     frame.style.zIndex = '2147483646';
-    frame.style.pointerEvents = 'none'; // Let clicks pass through iframe transparent areas
+    frame.style.pointerEvents = 'auto'; // Need auto for UI buttons to work
     frame.style.display = 'none'; // Start hidden
     container.appendChild(frame);
     uiFrame = frame;
