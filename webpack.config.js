@@ -42,6 +42,7 @@ module.exports = {
       patterns: [
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'src/icons', to: 'icons' },
+        { from: 'src/imgs', to: 'src/imgs' },
         { from: 'src/content/content.css', to: 'content.css' },
         // Copy Tesseract.js worker files
         { 
