@@ -3,17 +3,12 @@
  * Performs OCR on images to extract text
  */
 
+// Import Tesseract directly (not dynamic import to avoid chunk loading issues)
+import Tesseract from 'tesseract.js';
+
 // Cache worker to avoid repeated initialization
 let worker = null;
 let workerPromise = null;
-let tesseractModule = null;
-
-async function loadTesseract() {
-  if (tesseractModule) return tesseractModule;
-  const module = await import('tesseract.js');
-  tesseractModule = module.default || module;
-  return tesseractModule;
-}
 
 /**
  * Initialize Tesseract worker (lazy loading)
@@ -25,8 +20,11 @@ async function getWorker() {
   
   workerPromise = (async () => {
     console.log('Initializing Tesseract.js worker...');
-    const Tesseract = await loadTesseract();
+    
+    // Use CDN paths for worker and core files to avoid extension URL issues
     const newWorker = await Tesseract.createWorker('eng', 1, {
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js',
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5/tesseract-core-simd.wasm.js',
       logger: (m) => {
         if (m.status === 'recognizing text') {
           console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
