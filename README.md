@@ -2,6 +2,9 @@
 
 Proactive AI Assistant is a Chrome extension that watches what you hover or select on the web and surfaces the most helpful AI tools in-place. It can explain code, summarize articles, graph equations, extract tables, run OCR on images, and more—all without leaving the page.
 
+## Demo
+![Demo](screenshots/demo.png)
+
 ## Quick Start
 
 1. **Install dependencies**
